@@ -388,7 +388,7 @@ class CommandTokenizer(Tokenizer):
                             # we don't know what should be after an unknown arg,
                             # so we skip the remaining line
                             tok.type = TokenType.error
-                            tok.value = "Invalid selector argument: %s" % arg
+                            tok.value = "Invalid selector argument: %r" % arg
                             return
                     self.expect_char("=")
                     if arg in (
@@ -924,7 +924,7 @@ class CommandTokenizer(Tokenizer):
     
     def c_tell(self):
         self.token_target()
-        self.token_message()
+        self.token_skip_line()
     
     def c_music(self):
         mode = self.token_options("play", "queue", "stop", "volumn")

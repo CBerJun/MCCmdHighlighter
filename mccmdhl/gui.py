@@ -14,16 +14,16 @@ class MCCommandHightlighter:
         self.error_var = error_var # Error message will be updated to it
         self.root = self.text.tk
         self.text_redir = WidgetRedirector(self.text)
-        self.orig_ins = self.text_redir.register("insert", self.on_text_insert)
-        self.orig_del = self.text_redir.register("delete", self.on_text_delete)
+        self.orig_ins = self.text_redir.register("insert", self.text_insert)
+        self.orig_del = self.text_redir.register("delete", self.text_delete)
         # create color font
         self.TOKEN2FORMAT = {
             TokenType.comment: {"foreground": "DeepSkyBlue"},
             TokenType.command: {"foreground": "green"},
             TokenType.option: {"foreground": "DarkOrange"},
-            TokenType.number: {"foreground": "MediumSeaGreen"},
-            TokenType.string: {"foreground": "SandyBrown"},
-            TokenType.boolean: {"foreground": "MediumSeaGreen"},
+            TokenType.number: {"foreground": "LimeGreen"},
+            TokenType.string: {"foreground": "DimGray"},
+            TokenType.boolean: {"foreground": "SeaGreen"},
             TokenType.selector: {"foreground": "DarkViolet"},
             TokenType.scoreboard: {
                 "foreground": "DarkBlue",
@@ -47,7 +47,7 @@ class MCCommandHightlighter:
         # get lineno from Text widget index "X.X"
         return int(index.split(".")[0])
 
-    def on_text_insert(self, index: str, chars: str, tags=None):
+    def text_insert(self, index: str, chars: str, tags=None):
         index = self.text.index(index)
         self.orig_ins(index, chars, tags)
         # We update in group of lines
@@ -56,7 +56,7 @@ class MCCommandHightlighter:
         line_end = line_start + line_count
         self.update_text(line_start, line_end)
     
-    def on_text_delete(self, index1: str, index2=None):
+    def text_delete(self, index1: str, index2=None):
         index1 = self.text.index(index1)
         if index2 is not None:
             index2_ = self.text.index(index2)

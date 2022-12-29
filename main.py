@@ -13,12 +13,8 @@ text.grid(row=0, column=0)
 error_var = tkinter.StringVar(root)
 lab = tkinter.Label(root, font=font, textvariable=error_var, foreground="red")
 lab.grid(row=1, column=0)
-MCCommandHightlighter(text, error_var)
+highlighter = MCCommandHightlighter(text, error_var)
+highlighter.text_insert("1.0", """# Comment
+ability @a[name=string,tag=tag,scores={score=1..2},y=~1] mute true
+""")
 root.mainloop()
-
-'''
-# This is a comment
-camerashake add @e[name="xxx",tag=xyz,scores={sc=-1}] 2.3 10 positional
-ability @e[type=minecraft:xxx,tag=xyz,scores={sc=!-2..5}] worldbuilder false
-clear CBerJun minecraft:some_item 0 10
-'''
