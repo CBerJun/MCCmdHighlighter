@@ -7,8 +7,12 @@ You can run `main.py` and just type in commands into the GUI.
 No thirdparty packages is required. You should see the commands colorized!
 Tags and scoreboards are marked in *italic form*.
 Options in command, selector, namespaced id and numbers all have different colors.
-Also, errors are marked red and <u>underlined</u>.
+Also, errors are marked red and underlined.
 All errors have a message!
+
+## Notice
+This project is still in develop and **not all the commands are supported**.
+Each command is supported in `mccmdhl.command.CommandTokenizer.c_<Name>`.
 
 ## Troubleshooting
 Your Python may tell you that `idlelib` is not installed.

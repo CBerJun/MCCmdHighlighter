@@ -251,7 +251,8 @@ class CommandTokenizer(Tokenizer):
             # handle alias
             ALIAS = {
                 "?": "help", "connect": "wsserver", "daylock": "alwaysday",
-                "msg": "tell", "w": "tell"
+                "msg": "tell", "w": "tell", "tp": "teleport",
+                "wb": "worldbuilder"
             }
             command = ALIAS.get(command, command)
             command_method = getattr(self, "c_%s" % command, None)
@@ -506,12 +507,12 @@ class CommandTokenizer(Tokenizer):
         with self.create_token(TokenType.pos) as tok:
             if self.current_char == "~":
                 self.forward()
-            yaw = self.number()
+            yaw = self.expect(self.number, tok)
             self.check_number(yaw, tok, -180, 180)
         with self.create_token(TokenType.pos) as tok:
             if self.current_char == "~":
                 self.forward()
-            pitch = self.number()
+            pitch = self.expect(self.number, tok)
             self.check_number(pitch, tok, -90, 90)
     
     def token_full_pos(self, dimension = 3):
@@ -532,6 +533,10 @@ class CommandTokenizer(Tokenizer):
         with self.create_token(TokenType.string) as tok:
             self.expect(self.string, tok)
     
+    def token_boolean(self):
+        with self.create_token(TokenType.boolean) as tok:
+            self.expect(self.boolean, tok)
+    
     def token_scoreboard(self):
         with self.create_token(TokenType.scoreboard) as tok:
             self.expect(self.string, tok)
@@ -546,6 +551,24 @@ class CommandTokenizer(Tokenizer):
             if not path:
                 tok.type = TokenType.error
                 tok.value = error
+    
+    def token_bool_or_options(self, *options):
+        # true, false, or `options`
+        # return True if true or false is used,
+        # return False if `options` are used
+        # return None if error
+        with self.create_token() as tok:
+            word = self.expect(self.word, tok)
+            if word in ("true", "false"):
+                tok.type = TokenType.boolean
+                return True
+            elif word in options:
+                tok.type = TokenType.option
+                return False
+            else:
+                tok.type = TokenType.error
+                tok.value = "Expecting boolean or other options"
+                return None
     
     # Following are the definitions of commands
 
@@ -562,13 +585,11 @@ class CommandTokenizer(Tokenizer):
         self.token_target()
         if self.command_not_end():
             self.token_options("worldbuilder", "mayfly", "mute")
-            with self.create_token(TokenType.boolean) as tok:
-                self.expect(self.boolean, tok)
+            self.token_boolean()
     
     def c_alwaysday(self):
         if self.command_not_end():
-            with self.create_token(TokenType.boolean) as tok:
-                self.expect(self.boolean, tok)
+            self.token_boolean()
     
     def c_camerashake(self):
         mode = self.token_options("add", "stop")
@@ -670,8 +691,7 @@ class CommandTokenizer(Tokenizer):
                     amplifier = self.expect(self.integer, tok)
                     self.check_number(amplifier, tok, 0, 255)
                 if self.command_not_end():
-                    with self.create_token(TokenType.boolean) as tok:
-                        self.expect(self.boolean, tok)
+                    self.token_boolean()
     
     def c_enchant(self):
         self.token_target() # player
@@ -854,8 +874,7 @@ class CommandTokenizer(Tokenizer):
     
     def c_immutableworld(self):
         if self.command_not_end():
-            with self.create_token(TokenType.boolean) as tok:
-                self.expect(self.boolean, tok)
+            self.token_boolean()
     
     def c_kick(self):
         self.token_target()
@@ -875,8 +894,7 @@ class CommandTokenizer(Tokenizer):
         elif mode == "structure":
             self.token_namespaced_id()
             if self.command_not_end():
-                with self.create_token(TokenType.boolean) as tok:
-                    self.expect(self.boolean, tok)
+                self.token_boolean()
     
     def c_loot(self):
         target_mode = self.token_options("spawn", "give", "insert", "replace")
@@ -919,8 +937,7 @@ class CommandTokenizer(Tokenizer):
     def c_mobevent(self):
         self.token_namespaced_id()
         if self.command_not_end():
-            with self.create_token(TokenType.boolean) as tok:
-                self.expect(self.boolean, tok)
+            self.token_boolean()
     
     def c_tell(self):
         self.token_target()
@@ -1039,7 +1056,7 @@ class CommandTokenizer(Tokenizer):
         elif mode == "summon_rider":
             self.token_namespaced_id() # entityType
             if self.command_not_end():
-                self.token_namespaced_id() # spawnEvent
+                self.token_spawn_event() # spawnEvent
                 if self.command_not_end():
                     self.token_string() # nameTag
         elif mode == "summon_ride":
@@ -1049,7 +1066,7 @@ class CommandTokenizer(Tokenizer):
                     "skip_riders", "no_ride_change", "reassign_rides"
                 )
                 if self.command_not_end():
-                    self.token_namespaced_id() # spawnEvent
+                    self.token_spawn_event() # spawnEvent
                     if self.command_not_end():
                         self.token_string() # nameTag
     
@@ -1059,6 +1076,13 @@ class CommandTokenizer(Tokenizer):
     def c_say(self):
         self.token_skip_line()
     
+    def token_circle(self):
+        # <center:full_pos(3)> <radius:int>
+        self.token_full_pos()
+        with self.create_token(TokenType.number) as tok:
+            radius = self.expect(self.integer, tok)
+            self.check_number(radius, tok, 0)
+
     def c_schedule(self):
         self.token_options("on_area_loaded")
         self.token_options("add")
@@ -1068,10 +1092,7 @@ class CommandTokenizer(Tokenizer):
         else:
             mode = self.token_options("circle", "tickingarea")
             if mode == "circle":
-                self.token_full_pos()
-                with self.create_token(TokenType.number) as tok:
-                    radius = self.expect(self.number, tok)
-                    self.check_number(radius, tok, 0)
+                self.token_circle()
             elif mode == "tickingarea":
                 self.token_string() # name of tickingarea
         self.token_skip_line("Expecting mcfunction path")
@@ -1204,7 +1225,8 @@ class CommandTokenizer(Tokenizer):
         with self.create_token(TokenType.number) as tok:
             max_range = self.expect(self.number, tok)
             self.check_number(max_range, tok, 1)
-            if max_range <= distance:
+            if max_range is not None and distance is not None and \
+                max_range <= distance:
                 tok.type = TokenType.error
                 tok.value = "Spread range must be larger than distance"
         self.token_target()
@@ -1218,9 +1240,219 @@ class CommandTokenizer(Tokenizer):
             self.token_string()
     
     def c_structure(self):
-        ...
+        mode = self.token_options("save", "load", "delete")
+        self.token_string() # structure name
+        if mode == "save":
+            for _ in range(2):
+                self.token_full_pos()
+            if self.command_not_end():
+                entity_given = self.token_bool_or_options("memory", "disk")
+                if entity_given and self.command_not_end():
+                    self.token_options("memory", "disk")
+                    if self.command_not_end():
+                        self.token_boolean() # include blocks
+        elif mode == "load":
+            def _optional_arg2():
+                # [includeBlocks] [integrity] [seed]
+                self.token_boolean()
+                if self.command_not_end():
+                    with self.create_token(TokenType.number) as tok:
+                        integrity = self.expect(self.number, tok)
+                        self.check_number(integrity, tok, 0, 1)
+                    if self.command_not_end():
+                        self.token_string() # seed
+            def _optional_arg1():
+                # [<animationMode> <animationSeconds>] [<includeEntities>]
+                animate_given = not self.token_bool_or_options(
+                    "block_by_block", "layer_by_layer"
+                ) # animationMode or includeEntities
+                if self.command_not_end():
+                    if animate_given:
+                        with self.create_token(TokenType.number) as tok:
+                            animation_sec = self.expect(self.number, tok)
+                            self.check_number(animation_sec, tok, 0)
+                        if self.command_not_end():
+                            self.token_boolean() # include entities
+                            if self.command_not_end():
+                                _optional_arg2()
+                    else:
+                        _optional_arg2()
+            
+            self.token_full_pos()
+            if self.command_not_end():
+                self.token_options(
+                    "0_degrees", "90_degrees", "180_degrees", "270_degrees"
+                )
+                if self.command_not_end():
+                    self.token_options("none", "x", "z", "xz")
+                    if self.command_not_end():
+                        _optional_arg1()
+    
+    def token_spawn_event(self):
+        if self.current_char == "*":
+            with self.create_token(TokenType.string):
+                self.char("*")
+        else:
+            self.token_namespaced_id()
 
-    # TODO? /gametest /scriptevent
+    def c_summon(self):
+        self.token_namespaced_id() # entity type
+        if self.command_not_end():
+            if self.next_is_pos():
+                self.token_full_pos() # spawn pos
+                if self.command_not_end():
+                    self.token_spawn_event() # spawn event
+                    if self.command_not_end():
+                        self.token_string() # name tag
+            else:
+                self.token_string() # name tag
+                if self.command_not_end():
+                    self.token_full_pos() # spawn pos
+    
+    def c_tag(self):
+        self.token_target()
+        mode = self.token_options("add", "remove", "list")
+        if mode == "add" or mode == "remove":
+            with self.create_token(TokenType.tag) as tok:
+                self.expect(self.string, tok)
+    
+    def c_teleport(self):
+        # tp [<target>]
+        if not self.next_is_pos():
+            self.token_target()
+        # <target> | <position>
+        # if using position:
+        # [(facing (<entity> | <position>)) | <rotation> [<check_for_blocks>]]
+        if self.next_is_pos():
+            self.token_full_pos()
+            if self.command_not_end():
+                if self.next_is_rotation():
+                    self.token_rotation()
+                else:
+                    using_facing = not self.token_bool_or_options("facing")
+                    if using_facing: # <entity> | <position>
+                        if self.next_is_pos():
+                            self.token_full_pos()
+                        else:
+                            self.token_target()
+                if self.command_not_end(): # [<check_for_blocks>]
+                    self.token_boolean()
+        else:
+            self.token_target()
+            # [<check_for_blocks>]
+            if self.command_not_end():
+                self.token_boolean()
+    
+    def c_tellraw(self):
+        self.token_target()
+        self.token_json("object")
+    
+    def c_testfor(self):
+        self.token_target()
+    
+    def c_testforblock(self):
+        self.token_full_pos()
+        self.token_namespaced_id() # block
+        if self.command_not_end():
+            self.token_bs_or_data()
+    
+    def c_testforblocks(self):
+        for _ in range(3):
+            self.token_full_pos()
+        if self.command_not_end():
+            self.token_options("masked", "all")
+    
+    def c_tickingarea(self):
+        mode = self.token_options(
+            "add", "remove", "remove_all", "preload", "list"
+        )
+        if mode == "add":
+            if self.next_is_pos():
+                for _ in range(2):
+                    self.token_full_pos()
+            else:
+                self.token_options("circle")
+                self.token_circle()
+            if self.command_not_end():
+                self.token_string() # name
+                if self.command_not_end():
+                    self.token_boolean() # preload
+        elif mode == "remove":
+            if self.next_is_pos():
+                self.token_full_pos()
+            else:
+                self.token_string()
+        elif mode == "preload":
+            if self.next_is_pos():
+                self.token_full_pos()
+            else:
+                self.token_string()
+            if self.command_not_end():
+                self.token_boolean() # preload
+        elif mode == "list":
+            if self.command_not_end():
+                self.token_options("all-dimensions")
+    
+    def c_time(self):
+        mode = self.token_options("add", "query", "set")
+        if mode == "add":
+            self.token_any_integer()
+        elif mode == "query":
+            self.token_options("daytime", "gametime", "day")
+        elif mode == "set":
+            if self.next_is_number():
+                self.token_any_integer()
+            else:
+                self.token_options(
+                    "day", "noon", "sunrise", "sunset", "night", "midnight"
+                )
+    
+    def _title(self, token_msg_func):
+        self.token_target()
+        mode = self.token_options(
+            "clear", "reset", "title", "subtitle", "actionbar", "times"
+        )
+        if mode in ("title", "subtitle", "actionbar"):
+            token_msg_func()
+        elif mode == "times":
+            for _ in range(3):
+                self.token_any_integer()
+    
+    def c_title(self):
+        self._title(self.token_skip_line)
+    
+    def c_titleraw(self):
+        self._title(lambda: self.token_json("object"))
+    
+    def c_toggledownfall(self):
+        pass
+    
+    def c_worldbuilder(self):
+        pass
+    
+    def c_weather(self):
+        mode = self.token_options("clear", "rain", "thunder", "query")
+        if mode in ("clear", "rain", "thunder"):
+            if self.command_not_end():
+                with self.create_token(TokenType.number) as tok:
+                    duration = self.expect(self.integer, tok)
+                    self.check_number(duration, tok, 0, 1000000)
+    
+    def c_whitelist(self):
+        mode = self.token_options(
+            "add", "list", "off", "on", "reload", "remove"
+        )
+        if mode == "add" or mode == "remove":
+            self.token_target()
+    
+    def c_xp(self):
+        self.token_any_integer()
+        if self.current_char == "L":
+            self.char("L")
+        if self.command_not_end():
+            self.token_target()
+
+    # TODO? /gametest /scriptevent /volumearea
 
     def c_wsserver(self):
         with self.create_token() as tok:
