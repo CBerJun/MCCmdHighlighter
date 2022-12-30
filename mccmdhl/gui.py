@@ -6,6 +6,8 @@ from idlelib.redirector import WidgetRedirector
 
 from mccmdhl.command import TokenType, CommandTokenizer
 
+__all__ = ["MCCommandHightlighter"]
+
 class MCCommandHightlighter:
     ERROR_FORMAT = "{pos_begin}-{pos_end}: {message}"
 
@@ -17,6 +19,7 @@ class MCCommandHightlighter:
         self.orig_ins = self.text_redir.register("insert", self.text_insert)
         self.orig_del = self.text_redir.register("delete", self.text_delete)
         # create color font
+        # NOTE whenever you change TOKEN2FORMAT, please `update_font`
         self.TOKEN2FORMAT = {
             TokenType.comment: {"foreground": "DeepSkyBlue"},
             TokenType.command: {"foreground": "green"},
@@ -38,14 +41,17 @@ class MCCommandHightlighter:
                 "foreground": "red", "underline": True
             }
         }
-        # register color tags to Text widget
-        for tok_type, color in self.TOKEN2FORMAT.items():
-            self.text.tag_config(tok_type.name, **color)
+        self.update_font()
     
     @staticmethod
     def lineno_from_index(index: str):
         # get lineno from Text widget index "X.X"
         return int(index.split(".")[0])
+    
+    def update_font(self):
+        # register color tags to Text widget
+        for tok_type, color in self.TOKEN2FORMAT.items():
+            self.text.tag_config(tok_type.name, **color)
 
     def text_insert(self, index: str, chars: str, tags=None):
         index = self.text.index(index)

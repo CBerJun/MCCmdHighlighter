@@ -1,21 +1,8 @@
 import enum
 import contextlib
 
-class TokenType(enum.Enum):
-    comment = 1 # Comments
-    command = 2 # Name of a command like "execute"
-    option = 3 # Option of command like "players" after "scoreboard"
-    number = 4 # Number or range like "1", "3.4" or "2.."
-    string = 5 # String like `"abcd"` or `xyz` in `say xyz`
-    boolean = 6 # Boolean "true" and "false"
-    selector = 7 # The "@x" part of selector or a player name
-    scoreboard = 8 # Scoreboard name
-    tag = 9 # Tag name
-    pos = 10 # Position like "~1" or "^" or "3.2"
-    error = 11 # Unexpected
-
 class Token:
-    def __init__(self, type: TokenType, pos_begin, pos_end, value) -> None:
+    def __init__(self, type, pos_begin, pos_end, value) -> None:
         self.type = type
         self.value = value
         self.pos_begin = pos_begin
@@ -44,7 +31,7 @@ class Tokenizer:
         return "%d.%d" % (self.current_lineno, self.current_col)
     
     @contextlib.contextmanager
-    def create_token(self, type: TokenType = None, value = None):
+    def create_token(self, type = None, value = None):
         # `type` and `value` can be completed later using `with ... as tok`
         tok = Token(type, None, None, value)
         tok.pos_begin = self.current_index
