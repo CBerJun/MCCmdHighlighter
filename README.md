@@ -11,7 +11,9 @@ Also, errors are marked red and underlined.
 All errors have a message!
 
 ## Notice
-This project is still in develop and **not all the commands are supported**.
+This project is still in develop and **may differ from the original command system of Minecraft in some aspects**.
+Besides, not all commands are supported.
+In specific, `/gametest`, `/scriptevent` and `/volumearea` are not supported yet.
 Each command is supported in `mccmdhl.command.CommandTokenizer.c_<Name>`.
 
 ## Troubleshooting

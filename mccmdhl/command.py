@@ -2,6 +2,7 @@
 #   https://github.com/Mojang/brigadier/
 # Might help anyway.
 
+import enum
 from mccmdhl.tokenizer_base import *
 from mccmdhl.json_helper import JSONTokenizer
 
@@ -120,6 +121,15 @@ class CommandTokenizer(Tokenizer):
             self.forward()
         if not res:
             raise _CommandSyntaxError("Expecting a word")
+        # if an unquoted string looks like a number,
+        # Minecraft thinks it is a number.
+        try:
+            float(res)
+        except ValueError:
+            pass
+        else:
+            raise _CommandSyntaxError("A number-like word must be quoted")
+        
         self.skip_spaces()
         return res
     
@@ -166,9 +176,9 @@ class CommandTokenizer(Tokenizer):
     def integer(self):
         # read an integer
         res = ""
-        if self.current_char == "-":
-            self.forward() # skip minus
-            res += "-"
+        if self.current_char == "-" or self.current_char == "+":
+            res += self.current_char
+            self.forward() # skip +/-
         if not self.current_char.isdigit():
             raise _CommandSyntaxError("Expecting an integer")
         while self.current_char.isdigit():
@@ -183,9 +193,9 @@ class CommandTokenizer(Tokenizer):
     def number(self):
         # integer or floating number
         res = ""
-        if self.current_char == "-":
-            self.forward() # skip minus
-            res += "-"
+        if self.current_char == "-" or self.current_char == "+":
+            res += self.current_char
+            self.forward() # skip +/-
         if not self.current_char.isdigit():
             raise _CommandSyntaxError("Expecting a number")
         while self.current_char.isdigit():
@@ -339,7 +349,7 @@ class CommandTokenizer(Tokenizer):
                         "item", "data", "quantity", "location", "slot"
                     ):
                         tok.type = TokenType.error
-                        tok.value = "Invalid hasitem argument"
+                        tok.value = "Invalid hasitem argument: %r" % arg
                         return
                 args.append(arg)
                 self.expect_char("=")
@@ -1325,7 +1335,7 @@ class CommandTokenizer(Tokenizer):
                     self.token_full_pos() # spawn pos
     
     def c_tag(self):
-        self.token_target()
+        self.token_starrable_target()
         mode = self.token_options("add", "remove", "list")
         if mode == "add" or mode == "remove":
             with self.create_token(TokenType.tag) as tok:

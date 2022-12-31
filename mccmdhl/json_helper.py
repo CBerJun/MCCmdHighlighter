@@ -1,6 +1,8 @@
 # Helper and highlighter of JSON
 from mccmdhl.tokenizer_base import *
 
+__all__ = ["JSONTokenizer"]
+
 class _JSONSyntaxError(Exception):
     pass
 

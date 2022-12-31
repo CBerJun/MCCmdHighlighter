@@ -97,14 +97,11 @@ class MCCommandHightlighter:
                     self.error_var.get() == "" and \
                     self.lineno_from_index(token.pos_begin) == cursor_line
                 ):
-                    msg = self.ERROR_FORMAT.format(
+                    self.error_var.set(self.ERROR_FORMAT.format(
                         pos_begin = token.pos_begin,
                         pos_end = token.pos_end,
                         message = token.value
-                    )
-                    if len(msg) > 60:
-                        msg = msg[:57] + " ..."
-                    self.error_var.set(msg)
+                    ))
             # Add tag
             if token.type is TokenType.error and \
                 token.pos_begin == token.pos_end:
