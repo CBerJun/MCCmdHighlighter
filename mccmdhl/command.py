@@ -2,24 +2,10 @@
 #   https://github.com/Mojang/brigadier/
 # Might help anyway.
 
-import enum
 from mccmdhl.tokenizer_base import *
 from mccmdhl.json_helper import JSONTokenizer
 
 __all__ = ["CommandTokenizer", "Token", "TokenType"]
-
-class TokenType(enum.Enum):
-    comment = 1 # Comments
-    command = 2 # Name of a command like "execute"
-    option = 3 # Option of command like "players" after "scoreboard"
-    number = 4 # Number or range like "1", "3.4" or "2.."
-    string = 5 # String like `"abcd"` or `xyz` in `say xyz`
-    boolean = 6 # Boolean "true" and "false"
-    selector = 7 # The "@x" part of selector or a player name
-    scoreboard = 8 # Scoreboard name
-    tag = 9 # Tag name
-    pos = 10 # Position like "~1" or "^" or "3.2"
-    error = 11 # Unexpected
 
 class _CommandSyntaxError(Exception):
     pass
@@ -52,15 +38,14 @@ class CommandTokenizer(Tokenizer):
         return self.current_char != "\n" and self.current_char != self.EOF
     
     def next_is_number(self):
-        return self.current_char == "-" or self.current_char.isdigit()
+        return self.current_char == "-" or \
+            self.current_char == "+" or \
+            self.current_char.isdigit()
     
-    def next_is_word(self):
-        return (
-            "0" <= self.current_char <= "9" or
-            "a" <= self.current_char <= "z" or
-            "A" <= self.current_char <= "Z" or
-            self.current_char in "_-.+"
-        )
+    def next_is_terminating_char(self):
+        # Test result in MCBE 1.19.30
+        return self.current_char in ' ,@~^/$&"\'!#%+*=[{]}\\|<>`\n' or \
+            self.current_char == self.EOF
     
     def next_is_pos(self):
         return (
@@ -109,14 +94,31 @@ class CommandTokenizer(Tokenizer):
             tok.type = TokenType.error
             tok.value = "Number not in range: [%d, %s]" % (min, max)
 
-    # The following methods read different kinds of arguments.
-    # Spaces are allowed to seperate the arguments. Therefore, they all call
-    # the `skip_spaces` method when finish reading
+    def argument_end(self):
+        if not self.next_is_terminating_char():
+            raise _CommandSyntaxError("Expecting a terminating character")
+        if self.current_char == " ":
+            self.skip_spaces() # multiple spaces are skipped
 
-    def word(self):
-        # just like com.mojang.brigadier.StringReader.readUnquotedString
+    # The following methods read different kinds of arguments.
+    # After reading the expecting characters, they will expect a
+    # "terminating character" like space, "@", "~", etc.
+    # Also, Spaces are allowed to seperate the arguments.
+    # These 2 things are done by `argument_end` method
+
+    # The methods start with `raw_` will not call the `argument_end` method.
+    # e.g. `number_range` calls `raw_integer` rather than `integer`, since
+    # using `integer` is going to call `argument_end` twice
+
+    # `char` method is an exception. Since usually we don't want a terminating
+    # character after a single char like "=", `char` does not call
+    # `argument_end`. However, we still want the spaces to be skipped,
+    # so `skip_spaces` is called
+
+    def raw_word(self):
+        # an unquoted string
         res = ""
-        while self.next_is_word():
+        while not self.next_is_terminating_char():
             res += self.current_char
             self.forward()
         if not res:
@@ -129,52 +131,14 @@ class CommandTokenizer(Tokenizer):
             pass
         else:
             raise _CommandSyntaxError("A number-like word must be quoted")
-        
-        self.skip_spaces()
         return res
     
-    def quoted_string(self):
-        # a quoted string "xxx"
-        self.char('"') # skip '"'
-        while self.current_char != '"':
-            if self.current_char == "\\" and self.peek() == '"':
-                self.forward() # skip "\\"
-                self.forward() # skip '"'
-                continue
-            if self.current_char == self.EOF:
-                raise _CommandSyntaxError("Unclosed string")
-            self.forward()
-        self.forward() # skip last '"'
-        self.skip_spaces()
+    def raw_char(self, char: str):
+        if self.current_char != char:
+            raise _CommandSyntaxError("Expecting %r" % char)
+        self.forward()
     
-    def string(self):
-        # word or quoted string
-        if self.current_char == '"':
-            self.quoted_string()
-        else:
-            self.word()
-    
-    def namespaced_id(self):
-        # This name is given from MinecraftWiki,
-        # representing item id, block id, etc.
-        # See https://wiki.biligame.com/mc/命名空间ID
-        res = ""
-        while (
-            "0" <= self.current_char <= "9" or
-            "a" <= self.current_char <= "z" or
-            self.current_char in "_-.:"
-        ):
-            res += self.current_char
-            self.forward()
-        if not res:
-            raise _CommandSyntaxError("Expecting an namespaced identifier")
-        if res.count(":") > 1:
-            raise _CommandSyntaxError("More than 1 colon in namespaced id")
-        self.skip_spaces()
-        return res
-    
-    def integer(self):
-        # read an integer
+    def raw_integer(self):
         res = ""
         if self.current_char == "-" or self.current_char == "+":
             res += self.current_char
@@ -184,13 +148,12 @@ class CommandTokenizer(Tokenizer):
         while self.current_char.isdigit():
             res += self.current_char
             self.forward()
-        self.skip_spaces()
         num = int(res)
         if not -2**31 <= num <= 2**31-1:
             raise _CommandSyntaxError("Integer overflow")
         return num
     
-    def number(self):
+    def raw_number(self):
         # integer or floating number
         res = ""
         if self.current_char == "-" or self.current_char == "+":
@@ -209,34 +172,94 @@ class CommandTokenizer(Tokenizer):
             while self.current_char.isdigit():
                 res += self.current_char
                 self.forward()
-        self.skip_spaces()
         return float(res)
+
+    def word(self):
+        res = self.raw_word()
+        self.argument_end()
+        return res
+    
+    def quoted_string(self):
+        # a quoted string "xxx"
+        self.raw_char('"') # skip '"'
+        while self.current_char != '"':
+            if self.current_char == "\\" and self.peek() == '"':
+                self.forward() # skip "\\"
+                self.forward() # skip '"'
+                continue
+            if self.current_char == self.EOF:
+                raise _CommandSyntaxError("Unclosed string")
+            self.forward()
+        self.raw_char('"') # skip last '"'
+        self.argument_end()
+    
+    def string(self):
+        # word or quoted string
+        if self.current_char == '"':
+            self.quoted_string()
+        else:
+            self.word()
+        # this does not need to call `argument_end`, since
+        # both `quoted_string` and `word` call it for us
+    
+    def namespaced_id(self):
+        # This name is from MinecraftWiki, representing item id, block id, etc.
+        # See https://wiki.biligame.com/mc/命名空间ID
+        res = ""
+        while not self.next_is_terminating_char():
+            res += self.current_char
+            self.forward()
+        if not res:
+            raise _CommandSyntaxError("Expecting an namespaced identifier")
+        if not all((
+            "0" <= char <= "9" or "a" <= char <= "z" or char in "_-.:"
+        ) for char in res):
+            raise _CommandSyntaxError(
+                "[Warning] Namespaced id should only include "
+                "a-z, 0-9, _, -, . and :"
+            )
+        if res.count(":") > 1:
+            raise _CommandSyntaxError("More than 1 colon in namespaced id")
+        self.skip_spaces()
+        return res
+    
+    def integer(self):
+        # read an integer
+        res = self.raw_integer()
+        self.argument_end()
+        return res
+    
+    def number(self):
+        res = self.raw_number()
+        self.argument_end()
+        return res
     
     def number_range(self):
         # a number range like "2", "-1..", "3..5"
         start, end = None, None
         if self.next_is_number():
-            start = self.integer()
+            start = self.raw_integer()
+        self.skip_spaces() # MC accepts spaces around ".."
         if self.current_char == ".":
             self.forward() # skip one "."
-            self.char(".")
+            self.raw_char(".") # expect another "."
+            self.skip_spaces() # MC accepts spaces around ".."
             if self.next_is_number():
-                end = self.integer()
+                end = self.raw_integer()
         if start is None and end is None:
             raise _CommandSyntaxError("Expecting a number range")
         if (start is not None) and (end is not None) and (start > end):
             raise _CommandSyntaxError("Number range start larger than end")
+        self.argument_end()
 
     def boolean(self):
-        word = self.word()
-        if word is not None and word not in ("true", "false"):
+        word = self.raw_word()
+        if word not in ("true", "false"):
             raise _CommandSyntaxError("Expecting a boolean value")
+        self.argument_end()
     
     def char(self, char: str):
-        # a character
-        if self.current_char != char:
-            raise _CommandSyntaxError("Expecting %r" % char)
-        self.forward()
+        self.raw_char(char)
         self.skip_spaces()
     
     def pos(self):
@@ -253,11 +276,11 @@ class CommandTokenizer(Tokenizer):
         if res in ("relative", "local"):
             # number is not a must when "~" or "^" exist
             if self.next_is_number():
-                self.number()
+                self.raw_number()
         else: # number is a must when using absolute pos
             if not self.next_is_number():
                 raise _CommandSyntaxError("Expecting a position")
-            self.number()
+            self.raw_number()
         self.skip_spaces()
         return res
     
@@ -447,7 +470,8 @@ class CommandTokenizer(Tokenizer):
                         if self.current_char == "!":
                             self.forward() # skip "!" if exists
                         # NOTE tag accepts empty argument like "@a[tag=]"
-                        if self.next_is_word() or self.current_char == '"':
+                        if not self.next_is_terminating_char() or \
+                            self.current_char == '"':
                             with self.create_token(TokenType.tag) as tok:
                                 self.expect(self.string, tok)
                     elif arg == "hasitem":
@@ -487,8 +511,8 @@ class CommandTokenizer(Tokenizer):
         # blockstate like ["anchor": "north"]
         # only boolean, string, integer is allowed as value
         self.expect_char("[")
-        while True:
-            self.skip_spaces() # allow spaces before arguments
+        self.skip_spaces()
+        while self.current_char != "]":
             with self.create_token(TokenType.option) as tok:
                 self.expect(self.quoted_string, tok)
             self.expect_char(":")
@@ -511,7 +535,10 @@ class CommandTokenizer(Tokenizer):
             except _CommandSyntaxError:
                 break
             else:
-                continue
+                if self.current_char == "]":
+                    with self.create_token(
+                        TokenType.error, "Trailing comma is not allowed"
+                    ): pass
         self.expect_char("]")
 
     def token_bs_or_data(self):
@@ -529,16 +556,25 @@ class CommandTokenizer(Tokenizer):
     
     def token_rotation(self):
         # rotation like `90 ~-90`
+        yaw, pitch = 0, 0
         with self.create_token(TokenType.pos) as tok:
             if self.current_char == "~":
                 self.forward()
-            yaw = self.expect(self.number, tok)
+                if self.next_is_number():
+                    yaw = self.expect(self.number, tok)
+            else:
+                yaw = self.expect(self.number, tok)
             self.check_number(yaw, tok, -180, 180)
+        self.skip_spaces()
         with self.create_token(TokenType.pos) as tok:
             if self.current_char == "~":
                 self.forward()
-            pitch = self.expect(self.number, tok)
+                if self.next_is_number():
+                    pitch = self.expect(self.number, tok)
+            else:
+                pitch = self.expect(self.number, tok)
             self.check_number(pitch, tok, -90, 90)
+        self.skip_spaces()
     
     def token_full_pos(self, dimension = 3):
         # a full_pos consists of `dimension` `pos`es
@@ -596,15 +632,6 @@ class CommandTokenizer(Tokenizer):
                 return None
     
     # Following are the definitions of commands
-
-    def c_help(self):
-        with self.create_token() as tok:
-            if self.next_is_number():
-                tok.type = TokenType.number
-                self.expect(self.integer, tok)
-            else:
-                tok.type = TokenType.string
-                self.expect(self.word, tok)
     
     def c_ability(self):
         self.token_target()
@@ -693,10 +720,15 @@ class CommandTokenizer(Tokenizer):
                 self.token_string() # sceneName
     
     def c_difficulty(self):
-        self.token_options(
-            "easy", "normal", "hard", "peaceful",
-            "p", "e", "n", "h", "0", "1", "2", "3"
-        )
+        if self.next_is_number():
+            with self.create_token(TokenType.option) as tok:
+                value = self.expect(self.number, tok)
+                self.check_number(value, tok, 0, 3)
+        else:
+            self.token_options(
+                "easy", "normal", "hard", "peaceful",
+                "p", "e", "n", "h"
+            )
     
     def c_effect(self):
         self.token_target() # player
@@ -860,10 +892,17 @@ class CommandTokenizer(Tokenizer):
         self.token_skip_line("Expecting mcfunction path")
     
     def token_gamemode_option(self):
-        self.token_options(
-            "s", "c", "a", "d", "survival", "default"
-            "creative", "adventure", "0", "1", "2", "5"
-        )
+        if self.next_is_number():
+            with self.create_token(TokenType.option) as tok:
+                gm = self.expect(self.integer, tok)
+                if gm is not None and gm not in (0, 1, 2, 5):
+                    tok.type = TokenType.error
+                    tok.value = "Invalid game mode id"
+        else:
+            self.token_options(
+                "s", "c", "a", "d", "survival", "default"
+                "creative", "adventure"
+            )
     
     def c_gamemode(self):
         self.token_gamemode_option()
@@ -897,6 +936,16 @@ class CommandTokenizer(Tokenizer):
                 if self.command_not_end():
                     self.token_json("object") # component
     
+    def c_help(self):
+        if self.command_not_end():
+            with self.create_token() as tok:
+                if self.next_is_number():
+                    tok.type = TokenType.number
+                    self.expect(self.integer, tok)
+                else:
+                    tok.type = TokenType.string
+                    self.expect(self.word, tok)
+
     def c_immutableworld(self):
         if self.command_not_end():
             self.token_boolean()
@@ -1037,12 +1086,11 @@ class CommandTokenizer(Tokenizer):
         if mode == "block":
             self.token_full_pos()
             self.token_options("slot.container")
-            with self.create_token(TokenType.number) as tok:
-                self.expect(self.integer, tok)
         elif mode == "entity":
             self.token_target()
             with self.create_token(TokenType.string) as tok:
                 self.expect(self.word, tok) # slot
+        self.token_any_integer() # slot id
         # [oldItemHandling: ReplaceMode] <itemName: Item>
         using_handle_mode = False
         with self.create_token() as tok:
@@ -1470,15 +1518,6 @@ class CommandTokenizer(Tokenizer):
         if mode == "add" or mode == "remove":
             self.token_target()
     
-    def c_xp(self):
-        self.token_any_integer()
-        if self.current_char == "L":
-            self.char("L")
-        if self.command_not_end():
-            self.token_target()
-
-    # TODO? /gametest /scriptevent /volumearea
-
     def c_wsserver(self):
         with self.create_token() as tok:
             arg = self.skip_line()
@@ -1486,3 +1525,17 @@ class CommandTokenizer(Tokenizer):
                 tok.type = TokenType.option
             else:
                 tok.type = TokenType.string
+    
+    def c_xp(self):
+        with self.create_token(TokenType.number) as tok:
+            self.expect(self.raw_integer, tok)
+            # Here we expect raw integer.
+            # If not so, "/xp 1L @s" throws "Expecting a terminating character"
+            if self.current_char == "L" or self.current_char == "l":
+                self.forward()
+            # Now that we have detected "L", we should call `argument_end`
+            self.expect(self.argument_end, tok)
+        if self.command_not_end():
+            self.token_target()
+
+    # TODO? /gametest /scriptevent /volumearea

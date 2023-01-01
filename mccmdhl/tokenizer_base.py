@@ -1,6 +1,7 @@
+import enum
 import contextlib
 
-__all__ = ["Token", "Tokenizer"]
+__all__ = ["Token", "TokenType", "Tokenizer"]
 
 class Token:
     def __init__(self, type, pos_begin, pos_end, value) -> None:
@@ -13,6 +14,19 @@ class Token:
         return "<Token %s(%s) at %s-%s>" % (
             self.type.name, self.value, self.pos_begin, self.pos_end
         )
+
+class TokenType(enum.Enum):
+    comment = 1 # Comments
+    command = 2 # Name of a command like "execute"
+    option = 3 # Option of command like "players" after "scoreboard"
+    number = 4 # Number or range like "1", "3.4" or "2.."
+    string = 5 # String like `"abcd"` or `xyz` in `say xyz`
+    boolean = 6 # Boolean "true" and "false"
+    selector = 7 # The "@x" part of selector or a player name
+    scoreboard = 8 # Scoreboard name
+    tag = 9 # Tag name
+    pos = 10 # Position like "~1" or "^" or "3.2"
+    error = 11 # Unexpected
 
 class Tokenizer:
     EOF = "\x04"

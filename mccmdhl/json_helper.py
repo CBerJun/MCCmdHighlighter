@@ -123,8 +123,9 @@ class JSONTokenizer(Tokenizer):
         self.skip_spaces()
     
     def try_token_constant(self):
-        # try to read true, false or null, return if success
-        for const in ("true", "false", "null"):
+        # try to read true or false, return if success
+        # NOTE constant "null" seems to be deprecated in Minecraft
+        for const in ("true", "false"):
             chars = [self.current_char]
             for i in range(len(const) - 1):
                 chars.append(self.peek(i))
