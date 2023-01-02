@@ -11,9 +11,12 @@ font = TkFont(root, size=14)
 text = tkinter.Text(root, font=font)
 text.grid(row=0, column=0)
 error_var = tkinter.StringVar(root)
-lab = tkinter.Label(root, font=font, textvariable=error_var, foreground="red")
+lab = tkinter.Label(
+    root, font=font, textvariable=error_var,
+    foreground="red", wraplength=750
+)
 lab.grid(row=1, column=0)
-highlighter = MCCommandHightlighter(text, error_var)
+highlighter = MCCommandHightlighter(text, error_var, error_msg_max_length=150)
 highlighter.text_insert("1.0", """# Comment
 tp @a[name=string,tag=tag,scores={score=1..2},y=~1] 10 10 ~1 facing @p true
 """)

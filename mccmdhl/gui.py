@@ -11,9 +11,15 @@ __all__ = ["MCCommandHightlighter"]
 class MCCommandHightlighter:
     ERROR_FORMAT = "{pos_begin}-{pos_end}: {message}"
 
-    def __init__(self, text: tkinter.Text, error_var: tkinter.StringVar):
+    def __init__(
+        self, text: tkinter.Text, error_var: tkinter.StringVar,
+        error_msg_max_length: int = None
+    ):
+        # Error message is compressed when it is
+        # longer than `error_msg_max_length`. Can be None.
         self.text = text
         self.error_var = error_var # Error message will be updated to it
+        self.error_msg_max_length = error_msg_max_length
         self.root = self.text.tk
         self.text_redir = WidgetRedirector(self.text)
         self.orig_ins = self.text_redir.register("insert", self.text_insert)
@@ -97,11 +103,15 @@ class MCCommandHightlighter:
                     self.error_var.get() == "" and \
                     self.lineno_from_index(token.pos_begin) == cursor_line
                 ):
-                    self.error_var.set(self.ERROR_FORMAT.format(
+                    msg = self.ERROR_FORMAT.format(
                         pos_begin = token.pos_begin,
                         pos_end = token.pos_end,
-                        message = token.value
-                    ))
+                        message = str(token.value)
+                    )
+                    if self.error_msg_max_length is not None and \
+                        len(msg) > self.error_msg_max_length:
+                        msg = msg[:self.error_msg_max_length - 3] + "..."
+                    self.error_var.set(msg)
             # Add tag
             if token.type is TokenType.error and \
                 token.pos_begin == token.pos_end:

@@ -1,10 +1,11 @@
 # Helper and highlighter of JSON
+# This JSON does not allow the "null" constant, since it seems to be
+# deprecated in Minecraft
+# Besides, it can not handle multi-line JSON
 from mccmdhl.tokenizer_base import *
+from mccmdhl.error import *
 
 __all__ = ["JSONTokenizer"]
-
-class _JSONSyntaxError(Exception):
-    pass
 
 class JSONTokenizer(Tokenizer):
     
@@ -20,16 +21,16 @@ class JSONTokenizer(Tokenizer):
     def expect(self, func, tok: Token):
         try:
             return func()
-        except _JSONSyntaxError as err:
+        except Error as err:
             tok.type = TokenType.error
-            tok.value = str(err)
+            tok.value = err
             return None
     
     def expect_char(self, char: str):
         try:
             self.char(char)
-        except _JSONSyntaxError as err:
-            with self.create_token(TokenType.error, str(err)):
+        except Error as err:
+            with self.create_token(TokenType.error, err):
                 pass
     
     def token_any(self):
@@ -47,7 +48,7 @@ class JSONTokenizer(Tokenizer):
         elif self.current_char == "{":
             self.token_object()
         else:
-            with self.create_token(TokenType.error, "Expecting a JSON object"):
+            with self.create_token(TokenType.error, Error(ErrorType.EXP_JSON)):
                 pass
     
     def token_array(self):
@@ -57,7 +58,7 @@ class JSONTokenizer(Tokenizer):
             self.token_any()
             try:
                 self.char(",")
-            except _JSONSyntaxError:
+            except Error:
                 break
             else: # JSON does not allow trailing comma
                 continue
@@ -73,7 +74,7 @@ class JSONTokenizer(Tokenizer):
             self.token_any()
             try:
                 self.char(",")
-            except _JSONSyntaxError:
+            except Error:
                 break
             else: # JSON does not allow trailing comma
                 continue
@@ -81,7 +82,7 @@ class JSONTokenizer(Tokenizer):
     
     def char(self, char):
         if self.current_char != char:
-            raise _JSONSyntaxError("Expecting %r" % char)
+            raise Error(ErrorType.EXP_CHAR, char=char)
         self.forward() # skip char
         self.skip_spaces()
     
@@ -92,7 +93,7 @@ class JSONTokenizer(Tokenizer):
             self.forward() # skip minus
             res += "-"
         if not self.current_char.isdigit():
-            raise _JSONSyntaxError("Expecting a number")
+            raise Error(ErrorType.EXP_NUMBER)
         while self.current_char.isdigit():
             res += self.current_char
             self.forward()
@@ -100,7 +101,7 @@ class JSONTokenizer(Tokenizer):
             self.forward() # skip "."
             res += "."
             if not self.current_char.isdigit():
-                raise _JSONSyntaxError("Incomplete floating number")
+                raise Error(ErrorType.INCOMPLETE_FLOAT)
             while self.current_char.isdigit():
                 res += self.current_char
                 self.forward()
@@ -116,7 +117,7 @@ class JSONTokenizer(Tokenizer):
                 self.forward()
                 continue
             if self.current_char == self.EOF:
-                raise _JSONSyntaxError("Unclosed string")
+                raise Error(ErrorType.UNCLOSED_STRING)
             ## TODO more escapes
             self.forward()
         self.forward() # skip '"'
@@ -126,12 +127,15 @@ class JSONTokenizer(Tokenizer):
         # try to read true or false, return if success
         # NOTE constant "null" seems to be deprecated in Minecraft
         for const in ("true", "false"):
-            chars = [self.current_char]
-            for i in range(len(const) - 1):
-                chars.append(self.peek(i))
-            if "".join(chars) == const:
+            LC = len(const)
+            if self.current_char != const[0]:
+                continue
+            for i in range(LC - 1):
+                if self.peek(i) != const[i + 1]:
+                    break
+            else: # if find it IS a const
                 with self.create_token(TokenType.boolean):
-                    for _ in range(len(const)):
+                    for _ in range(LC):
                         self.forward()
                 self.skip_spaces()
                 return True

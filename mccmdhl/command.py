@@ -4,11 +4,9 @@
 
 from mccmdhl.tokenizer_base import *
 from mccmdhl.json_helper import JSONTokenizer
+from mccmdhl.error import *
 
 __all__ = ["CommandTokenizer", "Token", "TokenType"]
-
-class _CommandSyntaxError(Exception):
-    pass
 
 class CommandTokenizer(Tokenizer):
 
@@ -70,16 +68,16 @@ class CommandTokenizer(Tokenizer):
     def expect(self, func, token: Token):
         try:
             return func()
-        except _CommandSyntaxError as err:
+        except Error as err:
             token.type = TokenType.error
-            token.value = str(err)
+            token.value = err
             return None
     
     def expect_char(self, char: str):
         try:
             self.char(char)
-        except _CommandSyntaxError as err:
-            with self.create_token(TokenType.error, str(err)):
+        except Error as err:
+            with self.create_token(TokenType.error, err):
                 pass
     
     def check_number(self, number: int, tok: Token, min: int, max: int = None):
@@ -92,11 +90,11 @@ class CommandTokenizer(Tokenizer):
             test = min <= number <= max
         if not test:
             tok.type = TokenType.error
-            tok.value = "Number not in range: [%d, %s]" % (min, max)
+            tok.value = Error(ErrorType.NUMBER_OUT_OF_RANGE, min=min, max=max)
 
     def argument_end(self):
         if not self.next_is_terminating_char():
-            raise _CommandSyntaxError("Expecting a terminating character")
+            raise Error(ErrorType.EXP_TERMINATING_CHAR)
         if self.current_char == " ":
             self.skip_spaces() # multiple spaces are skipped
 
@@ -110,8 +108,9 @@ class CommandTokenizer(Tokenizer):
     # e.g. `number_range` calls `raw_integer` rather than `integer`, since
     # using `integer` is going to call `argument_end` twice
 
-    # `char` method is an exception. Since usually we don't want a terminating
-    # character after a single char like "=", `char` does not call
+    # `char` and `quoted_string` method are exceptions.
+    # Since usually we don't want a terminating character after a single char
+    # like "=" or a quoted string, `char` and `quoted_string` does not call
     # `argument_end`. However, we still want the spaces to be skipped,
     # so `skip_spaces` is called
 
@@ -122,7 +121,7 @@ class CommandTokenizer(Tokenizer):
             res += self.current_char
             self.forward()
         if not res:
-            raise _CommandSyntaxError("Expecting a word")
+            raise Error(ErrorType.EXP_WORD)
         # if an unquoted string looks like a number,
         # Minecraft thinks it is a number.
         try:
@@ -130,12 +129,12 @@ class CommandTokenizer(Tokenizer):
         except ValueError:
             pass
         else:
-            raise _CommandSyntaxError("A number-like word must be quoted")
+            raise Error(ErrorType.NUMLIKE_WORD)
         return res
     
     def raw_char(self, char: str):
         if self.current_char != char:
-            raise _CommandSyntaxError("Expecting %r" % char)
+            raise Error(ErrorType.EXP_CHAR, char=char)
         self.forward()
     
     def raw_integer(self):
@@ -144,13 +143,13 @@ class CommandTokenizer(Tokenizer):
             res += self.current_char
             self.forward() # skip +/-
         if not self.current_char.isdigit():
-            raise _CommandSyntaxError("Expecting an integer")
+            raise Error(ErrorType.EXP_INTEGER)
         while self.current_char.isdigit():
             res += self.current_char
             self.forward()
         num = int(res)
         if not -2**31 <= num <= 2**31-1:
-            raise _CommandSyntaxError("Integer overflow")
+            raise Error(ErrorType.INT_OVERFLOW)
         return num
     
     def raw_number(self):
@@ -160,7 +159,7 @@ class CommandTokenizer(Tokenizer):
             res += self.current_char
             self.forward() # skip +/-
         if not self.current_char.isdigit():
-            raise _CommandSyntaxError("Expecting a number")
+            raise Error(ErrorType.EXP_NUMBER)
         while self.current_char.isdigit():
             res += self.current_char
             self.forward()
@@ -168,18 +167,13 @@ class CommandTokenizer(Tokenizer):
             self.forward() # skip "."
             res += "."
             if not self.current_char.isdigit():
-                raise _CommandSyntaxError("Incomplete floating number")
+                raise Error(ErrorType.INCOMPLETE_FLOAT)
             while self.current_char.isdigit():
                 res += self.current_char
                 self.forward()
         return float(res)
-
-    def word(self):
-        res = self.raw_word()
-        self.argument_end()
-        return res
     
-    def quoted_string(self):
+    def raw_quoted_string(self):
         # a quoted string "xxx"
         self.raw_char('"') # skip '"'
         while self.current_char != '"':
@@ -188,10 +182,18 @@ class CommandTokenizer(Tokenizer):
                 self.forward() # skip '"'
                 continue
             if self.current_char == self.EOF:
-                raise _CommandSyntaxError("Unclosed string")
+                raise Error(ErrorType.UNCLOSED_STRING)
             self.forward()
         self.raw_char('"') # skip last '"'
+
+    def word(self):
+        res = self.raw_word()
         self.argument_end()
+        return res
+    
+    def quoted_string(self):
+        self.raw_quoted_string()
+        self.skip_spaces()
     
     def string(self):
         # word or quoted string
@@ -200,7 +202,7 @@ class CommandTokenizer(Tokenizer):
         else:
             self.word()
         # this does not need to call `argument_end`, since
-        # both `quoted_string` and `word` call it for us
+        # both `quoted_string` and `word` handle this for us
     
     def namespaced_id(self):
         # This name is from MinecraftWiki, representing item id, block id, etc.
@@ -210,16 +212,21 @@ class CommandTokenizer(Tokenizer):
             res += self.current_char
             self.forward()
         if not res:
-            raise _CommandSyntaxError("Expecting an namespaced identifier")
+            raise Error(ErrorType.EXP_ID)
         if not all((
             "0" <= char <= "9" or "a" <= char <= "z" or char in "_-.:"
         ) for char in res):
-            raise _CommandSyntaxError(
-                "[Warning] Namespaced id should only include "
-                "a-z, 0-9, _, -, . and :"
-            )
+            raise Error(ErrorType.ILLEGAL_CHAR_IN_ID)
         if res.count(":") > 1:
-            raise _CommandSyntaxError("More than 1 colon in namespaced id")
+            raise Error(ErrorType.MULTIPLE_COLONS_IN_ID)
+        # if an unquoted namespace id looks like a number,
+        # Minecraft thinks it is a number.
+        try:
+            float(res)
+        except ValueError:
+            pass
+        else:
+            raise Error(ErrorType.NUMLIKE_ID)
         self.skip_spaces()
         return res
     
@@ -247,15 +254,15 @@ class CommandTokenizer(Tokenizer):
             if self.next_is_number():
                 end = self.raw_integer()
         if start is None and end is None:
-            raise _CommandSyntaxError("Expecting a number range")
+            raise Error(ErrorType.EXP_INT_RANGE)
         if (start is not None) and (end is not None) and (start > end):
-            raise _CommandSyntaxError("Number range start larger than end")
+            raise Error(ErrorType.IMPOSSIBLE_RANGE)
         self.argument_end()
 
     def boolean(self):
         word = self.raw_word()
         if word not in ("true", "false"):
-            raise _CommandSyntaxError("Expecting a boolean value")
+            raise Error(ErrorType.EXP_BOOL)
         self.argument_end()
     
     def char(self, char: str):
@@ -279,7 +286,7 @@ class CommandTokenizer(Tokenizer):
                 self.raw_number()
         else: # number is a must when using absolute pos
             if not self.next_is_number():
-                raise _CommandSyntaxError("Expecting a position")
+                raise Error(ErrorType.EXP_POS)
             self.raw_number()
         self.skip_spaces()
         return res
@@ -293,7 +300,7 @@ class CommandTokenizer(Tokenizer):
             command = self.expect(self.word, tok)
             if command is None:
                 tok.type = TokenType.error
-                tok.value = "Expecting a command"
+                tok.value = Error(ErrorType.EXP_COMMAND)
                 self.skip_line()
                 return
             # handle alias
@@ -306,7 +313,7 @@ class CommandTokenizer(Tokenizer):
             command_method = getattr(self, "c_%s" % command, None)
             if command_method is None:
                 tok.type = TokenType.error
-                tok.value = "Unknown command: %r" % command
+                tok.value = Error(ErrorType.UNKNOWN_COMMAND, command=command)
                 self.skip_line()
                 return
             tok.value = command
@@ -314,8 +321,9 @@ class CommandTokenizer(Tokenizer):
         command_method()
         ## line should end here
         if self.command_not_end():
-            with self.create_token(TokenType.error, "Expecting a new line"):
-                self.skip_line()
+            with self.create_token(
+                TokenType.error, Error(ErrorType.TOO_MANY_ARGS)
+            ): self.skip_line()
 
     def token_comment(self):
         # create token for comment
@@ -336,7 +344,7 @@ class CommandTokenizer(Tokenizer):
                     self.expect(self.string, tok)
                     if self.current_char == self.EOF:
                         tok.type = TokenType.error
-                        tok.value = 'Unclosed "{"'
+                        tok.value = Error(ErrorType.UNCLOSED_BRACE)
                         return
                 self.expect_char("=")
                 if self.current_char == "!":
@@ -345,7 +353,7 @@ class CommandTokenizer(Tokenizer):
                     self.expect(self.number_range, tok)
                 try:
                     self.char(",")
-                except _CommandSyntaxError:
+                except Error:
                     break # if couldn't find char ","
                 else:
                     # since MC does not allow trailing comma,
@@ -363,7 +371,7 @@ class CommandTokenizer(Tokenizer):
                     arg = self.expect(self.word, tok)
                     if self.current_char == self.EOF:
                         tok.type = TokenType.error
-                        tok.value = 'Unclosed "{"'
+                        tok.value = Error(ErrorType.UNCLOSED_BRACE)
                         return
                     if arg is None:
                         self.skip_line()
@@ -372,7 +380,9 @@ class CommandTokenizer(Tokenizer):
                         "item", "data", "quantity", "location", "slot"
                     ):
                         tok.type = TokenType.error
-                        tok.value = "Invalid hasitem argument: %r" % arg
+                        tok.value = Error(
+                            ErrorType.INVALID_HASITEM_ARG, arg=arg
+                        )
                         return
                 args.append(arg)
                 self.expect_char("=")
@@ -392,14 +402,14 @@ class CommandTokenizer(Tokenizer):
                         self.expect(self.word, tok)
                 try:
                     self.char(",")
-                except _CommandSyntaxError:
+                except Error:
                     break # if couldn't find char ","
                 else: # to disallow trailing comma
                     continue
             self.expect_char("}")
             if "item" not in args:
                 with self.create_token(
-                    TokenType.error, '"item" argument is required for hasitem'
+                    TokenType.error, Error(ErrorType.HASITEM_MISSING_ITEM)
                 ): pass
         if self.current_char != "@":
             # a name
@@ -414,7 +424,7 @@ class CommandTokenizer(Tokenizer):
                     "a", "e", "r", "s", "p", "c", "v", "initiator"
                 ):
                     tok.type = TokenType.error
-                    tok.value = "Invalid selector type: %r" % var
+                    tok.value = Error(ErrorType.INVALID_SELECTOR_TYPE, var=var)
             if self.current_char == "[":
                 self.forward() # skip "["
                 while True:
@@ -426,7 +436,7 @@ class CommandTokenizer(Tokenizer):
                             return
                         if self.current_char == self.EOF:
                             tok.type = TokenType.error
-                            tok.value = 'Unclosed "["'
+                            tok.value = Error(ErrorType.UNCLOSED_BRACKET)
                             return
                         if arg not in (
                             "x", "y", "z", "dx", "dy", "dz", "r", "rm",
@@ -434,10 +444,12 @@ class CommandTokenizer(Tokenizer):
                             "rxm", "ry", "rym", "hasitem", "l", "lm", "m", "c"
                         ):
                             self.skip_line()
-                            # we don't know what should be after an unknown arg,
-                            # so we skip the remaining line
+                            # we don't know what should be after an unknown
+                            # arg, so we skip the remaining line
                             tok.type = TokenType.error
-                            tok.value = "Invalid selector argument: %r" % arg
+                            tok.value = Error(
+                                ErrorType.INVALID_SELECTOR_ARG, arg=arg
+                            )
                             return
                     self.expect_char("=")
                     if arg in (
@@ -462,8 +474,9 @@ class CommandTokenizer(Tokenizer):
                             kind = self.expect(self.pos, tok)
                             if kind == "local":
                                 tok.type = TokenType.error
-                                tok.value = ("^ pos can not be used for "
-                                "selector argument 'x', 'y' and 'z'")
+                                tok.value = Error(
+                                    ErrorType.LOCAL_POS_FOR_SELECTOR
+                                )
                     elif arg == "scores":
                         _handle_scores()
                     elif arg == "tag":
@@ -480,7 +493,7 @@ class CommandTokenizer(Tokenizer):
                         self.token_gamemode_option()
                     try:
                         self.char(",")
-                    except _CommandSyntaxError:
+                    except Error:
                         break # if couldn't find char ","
                     else:
                         continue # to disallow trailing comma
@@ -493,7 +506,10 @@ class CommandTokenizer(Tokenizer):
             option = self.expect(self.word, tok)
             if option is not None and option not in options:
                 tok.type = TokenType.error
-                tok.value = "Invalid option: %r" % option
+                tok.value = Error(
+                    ErrorType.INVALID_OPTION, option=option,
+                    correct = ", ".join(repr(opt) for opt in options)
+                )
                 return None
         return option
     
@@ -529,15 +545,15 @@ class CommandTokenizer(Tokenizer):
                         tok.type = TokenType.boolean
                     else:
                         tok.type = TokenType.error
-                        tok.value = "Expecting boolean, integer or string"
+                        tok.value = Error(ErrorType.EXP_BS_VALUE)
             try:
                 self.char(",")
-            except _CommandSyntaxError:
+            except Error:
                 break
             else:
                 if self.current_char == "]":
                     with self.create_token(
-                        TokenType.error, "Trailing comma is not allowed"
+                        TokenType.error, Error(ErrorType.TRAILING_COMMA)
                     ): pass
         self.expect_char("]")
 
@@ -546,12 +562,12 @@ class CommandTokenizer(Tokenizer):
         if self.next_is_number(): # data value
             with self.create_token(TokenType.number) as tok:
                 data = self.expect(self.integer, tok)
-            self.check_number(data, tok, -1, 32767)
+            self.check_number(data, tok, 0, 32767)
         elif self.current_char == "[": # block state
             self.token_blockstate()
         else:
             with self.create_token(
-                TokenType.error, "Expecting block state or data value"
+                TokenType.error, Error(ErrorType.EXP_BS_DV)
             ): self.skip_line()
     
     def token_rotation(self):
@@ -584,7 +600,7 @@ class CommandTokenizer(Tokenizer):
                 kinds.append(self.expect(self.pos, tok))
             if "relative" in kinds and "local" in kinds:
                 tok.type = TokenType.error
-                tok.value = "~ and ^ can not be used together"
+                tok.value = Error(ErrorType.LOCAL_POS_WITH_RELATIVE)
     
     def token_namespaced_id(self):
         with self.create_token(TokenType.string) as tok:
@@ -606,12 +622,12 @@ class CommandTokenizer(Tokenizer):
         with self.create_token(TokenType.number) as tok:
             self.expect(self.integer, tok)
     
-    def token_skip_line(self, error = "Expecting a message"):
+    def token_skip_line(self, error_type = ErrorType.EXP_MESSAGE):
         with self.create_token(TokenType.string) as tok:
             path = self.skip_line()
             if not path:
                 tok.type = TokenType.error
-                tok.value = error
+                tok.value = Error(error_type)
     
     def token_bool_or_options(self, *options):
         # true, false, or `options`
@@ -628,7 +644,10 @@ class CommandTokenizer(Tokenizer):
                 return False
             else:
                 tok.type = TokenType.error
-                tok.value = "Expecting boolean or other options"
+                tok.value = Error(
+                    ErrorType.EXP_BOOL_OR_OPTION,
+                    options=", ".join(repr(opt) for opt in options)
+                )
                 return None
     
     # Following are the definitions of commands
@@ -774,8 +793,9 @@ class CommandTokenizer(Tokenizer):
     def c_execute(self):
         subcmd = None
         if not self.command_not_end():
-            with self.create_token(TokenType.error, "Expecting a subcommand"):
-                pass
+            with self.create_token(
+                TokenType.error, Error(ErrorType.EXP_EXECUTE_SUBCMD)
+            ): pass
         while self.command_not_end():
             subcmd = self.token_options(
                 "align", "anchored", "as", "at", "facing", "in",
@@ -792,11 +812,10 @@ class CommandTokenizer(Tokenizer):
                         axes_set = set(axes)
                         if not axes_set.issubset({"x", "y", "z"}):
                             tok.type = TokenType.error
-                            tok.value = \
-                                "Axes can only include 'x', 'y' and 'z'"
+                            tok.value = Error(ErrorType.ILLEGAL_CHAR_IN_AXES)
                         if len(axes) != len(axes_set):
                             tok.type = TokenType.error
-                            tok.value = "Repeat 'x', 'y' or 'z'"
+                            tok.value = Error(ErrorType.REPEAT_CHAR_IN_AXES)
             elif subcmd == "anchored":
                 self.token_anchor_option()
             elif subcmd == "as" or subcmd == "at":
@@ -862,8 +881,7 @@ class CommandTokenizer(Tokenizer):
         # the last subcommand must be "run", "if" or "unless"
         if (subcmd is not None) and (subcmd not in ("run", "if", "unless")):
             with self.create_token(
-                TokenType.error,
-                '"execute" must end with "run", "if" or "unless"'
+                TokenType.error, Error(ErrorType.WRONG_EXECUTE_END)
             ): pass
     
     def c_fill(self):
@@ -889,7 +907,7 @@ class CommandTokenizer(Tokenizer):
         self.token_string() # userProvidedID
     
     def c_function(self):
-        self.token_skip_line("Expecting mcfunction path")
+        self.token_skip_line(ErrorType.EXP_FUNCTION_PATH)
     
     def token_gamemode_option(self):
         if self.next_is_number():
@@ -897,7 +915,7 @@ class CommandTokenizer(Tokenizer):
                 gm = self.expect(self.integer, tok)
                 if gm is not None and gm not in (0, 1, 2, 5):
                     tok.type = TokenType.error
-                    tok.value = "Invalid game mode id"
+                    tok.value = Error(ErrorType.INVALID_GAMEMODE_ID)
         else:
             self.token_options(
                 "s", "c", "a", "d", "survival", "default"
@@ -1168,7 +1186,7 @@ class CommandTokenizer(Tokenizer):
                 self.token_circle()
             elif mode == "tickingarea":
                 self.token_string() # name of tickingarea
-        self.token_skip_line("Expecting mcfunction path")
+        self.token_skip_line(ErrorType.EXP_FUNCTION_PATH)
     
     def token_starrable_target(self):
         if self.current_char == "*":
@@ -1223,7 +1241,7 @@ class CommandTokenizer(Tokenizer):
                         self.forward() # <>
                 else:
                     with self.create_token(
-                        TokenType.error, "Expecting an operator"
+                        TokenType.error, Error(ErrorType.EXP_SCB_OP)
                     ): pass
                 self.skip_spaces()
                 self.token_starrable_target()
@@ -1238,7 +1256,7 @@ class CommandTokenizer(Tokenizer):
                     if (min_ is not None and max_ is not None) and \
                         min_ > max_:
                         tok.type = TokenType.error
-                        tok.value = "Random minimum value larger than maximum"
+                        tok.value = Error(ErrorType.IMPOSSIBLE_RANDOM)
             elif submode == "reset":
                 self.token_starrable_target()
                 if self.command_not_end():
@@ -1261,8 +1279,7 @@ class CommandTokenizer(Tokenizer):
                             if (min_ is not None and max_ is not None) and \
                                 min_ > max_:
                                 tok.type = TokenType.error
-                                tok.value = \
-                                    "Test minimum value larger than maximum"
+                                tok.value = Error(ErrorType.IMPOSSIBLE_TEST)
     
     def c_seed(self):
         pass
@@ -1301,7 +1318,7 @@ class CommandTokenizer(Tokenizer):
             if max_range is not None and distance is not None and \
                 max_range <= distance:
                 tok.type = TokenType.error
-                tok.value = "Spread range must be larger than distance"
+                tok.value = Error(ErrorType.IMPOSSIBLE_SPREAD)
         self.token_target()
     
     def c_stop(self):
