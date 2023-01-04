@@ -1,12 +1,10 @@
-# This is Minecraft's official one written in Java for Java Edition:
-#   https://github.com/Mojang/brigadier/
-# Might help anyway.
+# The main command tokenizer
 
 from mccmdhl.tokenizer_base import *
 from mccmdhl.json_helper import JSONTokenizer
 from mccmdhl.error import *
 
-__all__ = ["CommandTokenizer", "Token", "TokenType"]
+__all__ = ["CommandTokenizer"]
 
 class CommandTokenizer(Tokenizer):
 
@@ -35,10 +33,12 @@ class CommandTokenizer(Tokenizer):
     def command_not_end(self):
         return self.current_char != "\n" and self.current_char != self.EOF
     
+    @staticmethod
+    def is_number(char: str):
+        return char == "-" or char == "+" or char.isdigit()
+
     def next_is_number(self):
-        return self.current_char == "-" or \
-            self.current_char == "+" or \
-            self.current_char.isdigit()
+        return self.is_number(self.current_char)
     
     def next_is_terminating_char(self):
         # Test result in MCBE 1.19.30
@@ -54,6 +54,26 @@ class CommandTokenizer(Tokenizer):
     
     def next_is_rotation(self):
         return self.next_is_number() or self.current_char == "~"
+    
+    def skip_space_until(self, rule):
+        # What this does:
+        # 1. find the first non-space character `char`
+        # 2. calculate `rule(char)`,
+        #    if it is True, skip to the `char` and return True
+        #    else, return False
+        if self.current_char == " ":
+            i = 0
+            while self.peek(i) == " ":
+                i += 1
+            succeed = rule(self.peek(i))
+            if succeed:
+                # Above we are using `peek`, now we really skip the spaces
+                for _ in range(i + 1):
+                    self.forward()
+            return succeed
+        elif rule(self.current_char):
+            return True
+        return False
 
     def skip_line(self):
         # skip the whole line
@@ -246,12 +266,12 @@ class CommandTokenizer(Tokenizer):
         start, end = None, None
         if self.next_is_number():
             start = self.raw_integer()
-        self.skip_spaces() # MC accepts spaces around ".."
-        if self.current_char == ".":
+        using_dot = self.skip_space_until(lambda c: c == ".")
+        if using_dot:
             self.forward() # skip one "."
             self.raw_char(".") # expect another "."
-            self.skip_spaces() # MC accepts spaces around ".."
-            if self.next_is_number():
+            using_end = self.skip_space_until(self.is_number)
+            if using_end:
                 end = self.raw_integer()
         if start is None and end is None:
             raise Error(ErrorType.EXP_INT_RANGE)
@@ -1410,6 +1430,14 @@ class CommandTokenizer(Tokenizer):
         # tp [<target>]
         if not self.next_is_pos():
             self.token_target()
+            # We allow the command just ends here, when only a target is given
+            # because this matches `tp <destination: target>`
+            # But you might think: Can there be `checkForBlocks: Boolean`
+            # after target?
+            # The answer is no. In Minecraft, "tp @s true" seems to be
+            # understood as "teleport @s to a player named 'true'"
+            if not self.command_not_end():
+                return
         # <target> | <position>
         # if using position:
         # [(facing (<entity> | <position>)) | <rotation> [<check_for_blocks>]]
@@ -1417,15 +1445,18 @@ class CommandTokenizer(Tokenizer):
             self.token_full_pos()
             if self.command_not_end():
                 if self.next_is_rotation():
+                    check_for_blocks = False
                     self.token_rotation()
                 else:
-                    using_facing = not self.token_bool_or_options("facing")
-                    if using_facing: # <entity> | <position>
+                    check_for_blocks = self.token_bool_or_options("facing")
+                    if not check_for_blocks: # if using facing
+                        # <entity> | <position>
                         if self.next_is_pos():
                             self.token_full_pos()
                         else:
                             self.token_target()
-                if self.command_not_end(): # [<check_for_blocks>]
+                if not check_for_blocks and self.command_not_end():
+                    # [<check_for_blocks>]
                     self.token_boolean()
         else:
             self.token_target()
