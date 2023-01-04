@@ -1548,6 +1548,22 @@ class CommandTokenizer(Tokenizer):
     def c_toggledownfall(self):
         pass
     
+    def c_volumnarea(self):
+        mode = self.token_options("add", "list", "remove", "remove_all")
+        if mode == "add":
+            self.token_string() # identifier
+            self.token_full_pos() # from
+            self.token_full_pos() # to
+            self.token_string() # name
+        elif mode == "list":
+            if self.command_not_end():
+                self.token_options("all-dimensions")
+        elif mode == "remove":
+            if self.next_is_pos():
+                self.token_full_pos()
+            else:
+                self.token_string()
+    
     def c_worldbuilder(self):
         pass
     
