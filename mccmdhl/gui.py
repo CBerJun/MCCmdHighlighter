@@ -11,40 +11,44 @@ __all__ = ["MCCommandHightlighter"]
 class MCCommandHightlighter:
     ERROR_FORMAT = "{pos_begin}-{pos_end}: {message}"
 
-    def __init__(
-        self, text: tkinter.Text, error_var: tkinter.StringVar,
-        error_msg_max_length: int = None
-    ):
-        # Error message is compressed when it is
-        # longer than `error_msg_max_length`. Can be None.
+    def __init__(self, text: tkinter.Text, set_error_msg):
+        # set_error_msg:function; Whenever error message changes, this is
+        # called with 1 Token as argument, which is the error token.
+        # This argument might be None when no error is found in this line
         self.text = text
-        self.error_var = error_var # Error message will be updated to it
-        self.error_msg_max_length = error_msg_max_length
-        self.root = self.text.tk
+        self.BASIC_FONT = TkFont(font=text.cget("font"))
         self.text_redir = WidgetRedirector(self.text)
         self.orig_ins = self.text_redir.register("insert", self.text_insert)
         self.orig_del = self.text_redir.register("delete", self.text_delete)
+        self.error_set = set_error_msg
         # create color font
-        # NOTE whenever you change TOKEN2FORMAT, please `update_font`
+        # NOTE:
+        #  1. If you wish to change `TOKEN2FORMAT`, please call `update_font`;
+        #  2. If you wish to override "font" attribute of these tokens, please
+        #  use a copy of `self.BASIC_FONT` and then `config` it. `font_scb`
+        #  below is a good example.
+        ## add italic to scoreboard and tag
+        font_scb = self.BASIC_FONT.copy()
+        font_scb.config(slant="italic")
+        font_tag = font_scb.copy()
+        ## define font
         self.TOKEN2FORMAT = {
             TokenType.comment: {"foreground": "DeepSkyBlue"},
-            TokenType.command: {"foreground": "green"},
+            TokenType.command: {"foreground": "Green"},
             TokenType.option: {"foreground": "DarkOrange"},
             TokenType.number: {"foreground": "LimeGreen"},
             TokenType.string: {"foreground": "DimGray"},
             TokenType.boolean: {"foreground": "SeaGreen"},
             TokenType.selector: {"foreground": "DarkViolet"},
             TokenType.scoreboard: {
-                "foreground": "DarkBlue",
-                "font": TkFont(self.root, slant="italic")
+                "foreground": "DarkBlue", "font": font_scb
             },
             TokenType.tag: {
-                "foreground": "Blue",
-                "font": TkFont(self.root, slant="italic")
+                "foreground": "Blue", "font": font_tag
             },
             TokenType.pos: {"foreground": "DarkTurquoise"},
             TokenType.error: {
-                "foreground": "red", "underline": True
+                "foreground": "Red", "underline": True
             }
         }
         self.update_font()
@@ -58,6 +62,15 @@ class MCCommandHightlighter:
         # register color tags to Text widget
         for tok_type, color in self.TOKEN2FORMAT.items():
             self.text.tag_config(tok_type.name, **color)
+    
+    def errmsg_from_token(self, token):
+        # get error message from token
+        assert token.type is TokenType.error
+        return self.ERROR_FORMAT.format(
+            pos_begin = token.pos_begin,
+            pos_end = token.pos_end,
+            message = str(token.value)
+        )
 
     def text_insert(self, index: str, chars: str, tags=None):
         index = self.text.index(index)
@@ -93,25 +106,14 @@ class MCCommandHightlighter:
             self.text.tag_remove(tok_type.name, index1, index2)
         ## update
         cursor_line = self.lineno_from_index(self.text.index("insert"))
-        self.error_var.set("") # empty error
+        error_tok = None
         for token in tokens:
             # Update error message if token is error
             if token.type is TokenType.error:
                 # Update error message, if user's cursor is at this line
-                # and if the message is empty (not set) yet
-                if (
-                    self.error_var.get() == "" and \
-                    self.lineno_from_index(token.pos_begin) == cursor_line
-                ):
-                    msg = self.ERROR_FORMAT.format(
-                        pos_begin = token.pos_begin,
-                        pos_end = token.pos_end,
-                        message = str(token.value)
-                    )
-                    if self.error_msg_max_length is not None and \
-                        len(msg) > self.error_msg_max_length:
-                        msg = msg[:self.error_msg_max_length - 3] + "..."
-                    self.error_var.set(msg)
+                if self.lineno_from_index(token.pos_begin) == cursor_line and \
+                    error_tok == None:
+                    error_tok = token
             # Add tag
             if token.type is TokenType.error and \
                 token.pos_begin == token.pos_end:
@@ -124,6 +126,7 @@ class MCCommandHightlighter:
             else:
                 pos_end = token.pos_end
             self.text.tag_add(token.type.name, token.pos_begin, pos_end)
+        self.error_set(error_tok)
 
 if __name__ == "__main__":
     tokenizer = CommandTokenizer("camerashake add @a ")
