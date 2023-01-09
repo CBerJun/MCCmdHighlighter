@@ -381,8 +381,9 @@ class CommandTokenizer(Tokenizer):
                     continue
             self.forward() # skip "}"
     
-        def _handle_hasitem():
+        def _hasitem_component():
             # just to decrease indentation :)
+            # One object quoted by {} in hasitem
             self.expect_char("{")
             args = []
             while True:
@@ -431,6 +432,22 @@ class CommandTokenizer(Tokenizer):
                 with self.create_token(
                     TokenType.error, Error(ErrorType.HASITEM_MISSING_ITEM)
                 ): pass
+        
+        def _handle_hasitem():
+            if self.current_char == "[":
+                self.expect_char("[")
+                while True:
+                    _hasitem_component()
+                    try:
+                        self.char(",")
+                    except Error:
+                        break
+                    else: # disallow trailing comma
+                        continue
+                self.expect_char("]")
+            else:
+                _hasitem_component()
+
         if self.current_char != "@":
             # a name
             with self.create_token(TokenType.selector) as tok:
@@ -776,7 +793,7 @@ class CommandTokenizer(Tokenizer):
             if effect == "clear":
                 tok.type = TokenType.option
                 return
-            else:
+            elif effect is not None: # make sure no error happens
                 tok.type = TokenType.string
         if self.command_not_end():
             with self.create_token(TokenType.number) as tok:
@@ -1033,14 +1050,14 @@ class CommandTokenizer(Tokenizer):
         if source_mode == "kill":
             self.token_target()
         elif source_mode == "loot":
-            self.token_namespaced_id() # loot table
+            self.token_string() # loot table
         # mainhand | offhand | namespaced id (a tool)
         if self.command_not_end():
             with self.create_token() as tok:
                 tool = self.expect(self.namespaced_id, tok)
                 if tool == "mainhand" or tool == "offhand":
                     tok.type = TokenType.option
-                else:
+                elif tool is not None: # make sure no error happens
                     tok.type = TokenType.string
 
     def c_me(self):
@@ -1136,7 +1153,7 @@ class CommandTokenizer(Tokenizer):
             if item_or_handle in ("destroy", "keep"):
                 tok.type = TokenType.option
                 using_handle_mode = True
-            else:
+            elif item_or_handle is not None: # make sure no error happens
                 tok.type = TokenType.string
         if using_handle_mode: # require item name
             self.token_namespaced_id()

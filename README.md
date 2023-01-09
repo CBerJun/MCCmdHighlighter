@@ -4,13 +4,14 @@ A simple colorizer is also included.
 
 ## How do I use it?
 You can run `main.py` and just type in commands into the GUI.
-No thirdparty packages is required. You should see the commands colorized!
+No thirdparty package is required. Your commands should be colorized!
 Tags and scoreboards are marked in *italic form*.
-Options in command, selector, namespaced id and numbers all have different colors.
+Options in command, selector, namespaced id and number all have different colors.
 Also, errors are marked red and underlined.
-All errors have a message!
+All errors come with a message that tells you what's wrong!
 
 ## Notice
+This project is based on Minecraft: Bedrock Edition 1.19.51.
 This project is still in develop and **may differ from the original command system of Minecraft in some aspects**.
 Besides, not all commands are supported.
 In specific, `/gametest` and `/scriptevent` are not supported yet.
