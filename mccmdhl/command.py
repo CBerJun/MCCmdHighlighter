@@ -1051,10 +1051,10 @@ class CommandTokenizer(Tokenizer):
             self.token_target()
         elif source_mode == "loot":
             self.token_string() # loot table
-        # mainhand | offhand | namespaced id (a tool)
+        # mainhand | offhand | string (a tool)
         if self.command_not_end():
             with self.create_token() as tok:
-                tool = self.expect(self.namespaced_id, tok)
+                tool = self.expect(self.string, tok)
                 if tool == "mainhand" or tool == "offhand":
                     tok.type = TokenType.option
                 elif tool is not None: # make sure no error happens
@@ -1565,13 +1565,14 @@ class CommandTokenizer(Tokenizer):
     def c_toggledownfall(self):
         pass
     
-    def c_volumnarea(self):
+    def c_volumearea(self):
         mode = self.token_options("add", "list", "remove", "remove_all")
         if mode == "add":
             self.token_string() # identifier
             self.token_full_pos() # from
             self.token_full_pos() # to
-            self.token_string() # name
+            if self.command_not_end():
+                self.token_string() # name
         elif mode == "list":
             if self.command_not_end():
                 self.token_options("all-dimensions")
@@ -1619,4 +1620,4 @@ class CommandTokenizer(Tokenizer):
         if self.command_not_end():
             self.token_target()
 
-    # TODO? /gametest /scriptevent /volumearea
+    # TODO? /gametest /scriptevent
