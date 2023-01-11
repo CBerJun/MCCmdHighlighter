@@ -6,9 +6,9 @@ from idlelib.redirector import WidgetRedirector
 
 from mccmdhl.command import TokenType, CommandTokenizer
 
-__all__ = ["MCCommandHightlighter"]
+__all__ = ["MCCommandHighlighter"]
 
-class MCCommandHightlighter:
+class MCCommandHighlighter:
     ERROR_FORMAT = "{pos_begin}-{pos_end}: {message}"
 
     def __init__(self, text: tkinter.Text, set_error_msg):

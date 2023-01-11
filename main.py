@@ -1,7 +1,7 @@
 # The Minecraft command syntax highlighter
 #   by CBerJun 2022.12
 
-from mccmdhl import MCCommandHightlighter, Token
+from mccmdhl import MCCommandHighlighter, Token
 
 import tkinter
 from tkinter.font import Font as TkFont
@@ -24,7 +24,7 @@ def errmsg_update(token: Token):
         msg = highlighter.errmsg_from_token(token)
         error_var.set(msg)
 
-highlighter = MCCommandHightlighter(text, errmsg_update)
+highlighter = MCCommandHighlighter(text, errmsg_update)
 highlighter.text_insert("1.0", """# Comment
 tp @a[name=string,tag=tag,scores={score=1..2},y=~1] 10 10 ~1 facing @p true
 """)
