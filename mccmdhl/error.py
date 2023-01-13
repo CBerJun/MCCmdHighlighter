@@ -23,7 +23,7 @@ class ErrorType(enum.Enum):
     EXP_FUNCTION_PATH = "Expecting function path"
     EXP_SCB_OP = "Expecting one of +=, -=, *=, /=, %=, =, >, <, ><"
     UNCLOSED_STRING = "Unclosed string"
-    UNCLOSED_BRACE = "Unclosed '{'"
+    UNCLOSED_BRACE = "Unclosed '{{'"
     UNCLOSED_BRACKET = "Unclosed '['"
     TRAILING_COMMA = "Trailing comma is not allowed"
     NUMBER_OUT_OF_RANGE = "Number not in range: [{min}, {max}]"
