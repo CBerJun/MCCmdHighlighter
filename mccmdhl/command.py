@@ -489,15 +489,21 @@ class CommandTokenizer(Tokenizer):
                             )
                             return
                     self.expect_char("=")
+                    if arg in ("r", "rm"):
+                        with self.create_token(TokenType.number) as tok:
+                            r = self.expect(self.integer, tok)
+                            self.check_number(r, tok, 0)
                     if arg in (
-                        "dx", "dy", "dz", "r", "rm",
-                        "rx", "rxm", "ry", "rym"
+                        "dx", "dy", "dz", "rx", "rxm", "ry", "rym"
                     ):
                         with self.create_token(TokenType.number) as tok:
                             self.expect(self.number, tok)
-                    elif arg in ("l", "lm", "c"):
+                    elif arg == "c":
+                        self.token_any_integer()
+                    elif arg in ("l", "lm"):
                         with self.create_token(TokenType.number) as tok:
-                            self.expect(self.integer, tok)
+                            l = self.expect(self.integer, tok)
+                            self.check_number(l, tok, 0)
                     elif arg in ("name", "family"):
                         if self.current_char == "!":
                             self.forward() # skip "!" if exists
@@ -609,25 +615,17 @@ class CommandTokenizer(Tokenizer):
     
     def token_rotation(self):
         # rotation like `90 ~-90`
-        yaw, pitch = 0, 0
-        with self.create_token(TokenType.pos) as tok:
-            if self.current_char == "~":
-                self.forward()
-                if self.next_is_number():
-                    yaw = self.expect(self.number, tok)
-            else:
-                yaw = self.expect(self.number, tok)
-            self.check_number(yaw, tok, -180, 180)
-        self.skip_spaces()
-        with self.create_token(TokenType.pos) as tok:
-            if self.current_char == "~":
-                self.forward()
-                if self.next_is_number():
-                    pitch = self.expect(self.number, tok)
-            else:
-                pitch = self.expect(self.number, tok)
-            self.check_number(pitch, tok, -90, 90)
-        self.skip_spaces()
+        # NOTE we allow rotation out of [-180, 180] & [-90, 90] here
+        # since they might be used when using bisection
+        for _ in range(2):
+            with self.create_token(TokenType.pos) as tok:
+                if self.current_char == "~":
+                    self.forward()
+                    if self.next_is_number():
+                        self.expect(self.number, tok)
+                else:
+                    self.expect(self.number, tok)
+            self.skip_spaces()
     
     def token_full_pos(self, dimension = 3):
         # a full_pos consists of `dimension` `pos`es
