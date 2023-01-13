@@ -81,7 +81,6 @@ class CommandTokenizer(Tokenizer):
         while self.command_not_end():
             res += self.current_char
             self.forward()
-        self.forward() # skip "\n"
         res = res.rstrip()
         return res
     
