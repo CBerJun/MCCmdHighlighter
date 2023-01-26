@@ -27,6 +27,8 @@ class CommandTokenizer(Tokenizer):
             self.token_comment()
         elif self.current_char == "\n":
             self.forward()
+        elif self.current_char == self.EOF:
+            pass
         else:
             self.token_command()
     
