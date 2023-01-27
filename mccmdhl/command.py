@@ -309,7 +309,7 @@ class CommandTokenizer(Tokenizer):
             if not self.next_is_number():
                 raise Error(ErrorType.EXP_POS)
             self.raw_number()
-        self.skip_spaces()
+        self.argument_end()
         return res
     
     # The following method create tokens
@@ -606,7 +606,7 @@ class CommandTokenizer(Tokenizer):
         if self.next_is_number(): # data value
             with self.create_token(TokenType.number) as tok:
                 data = self.expect(self.integer, tok)
-            self.check_number(data, tok, 0, 32767)
+            self.check_number(data, tok, -1, 32767)
         elif self.current_char == "[": # block state
             self.token_blockstate()
         else:
@@ -615,18 +615,17 @@ class CommandTokenizer(Tokenizer):
             ): self.skip_line()
     
     def token_rotation(self):
-        # rotation like `90 ~-90`
+        # one rotation like `0`, `~3`
         # NOTE we allow rotation out of [-180, 180] & [-90, 90] here
         # since they might be used when using bisection
-        for _ in range(2):
-            with self.create_token(TokenType.pos) as tok:
-                if self.current_char == "~":
-                    self.forward()
-                    if self.next_is_number():
-                        self.expect(self.number, tok)
-                else:
+        with self.create_token(TokenType.pos) as tok:
+            if self.current_char == "~":
+                self.forward()
+                if self.next_is_number():
                     self.expect(self.number, tok)
-            self.skip_spaces()
+            else:
+                self.expect(self.number, tok)
+        self.skip_spaces()
     
     def token_full_pos(self, dimension = 3):
         # a full_pos consists of `dimension` `pos`es
@@ -873,6 +872,7 @@ class CommandTokenizer(Tokenizer):
                     self.token_target()
             elif subcmd == "rotated":
                 if self.next_is_rotation():
+                    self.token_rotation()
                     self.token_rotation()
                 else:
                     self.token_options("as")
@@ -1456,13 +1456,19 @@ class CommandTokenizer(Tokenizer):
                 return
         # <target> | <position>
         # if using position:
-        # [(facing (<entity> | <position>)) | <rotation> [<check_for_blocks>]]
+        # [(facing (<entity> | <position>)) |
+        #  (<YRot> <XRot> [<check_for_blocks>]) |
+        #  <YRot>]
         if self.next_is_pos():
             self.token_full_pos()
             if self.command_not_end():
                 if self.next_is_rotation():
                     check_for_blocks = False
                     self.token_rotation()
+                    if self.command_not_end():
+                        self.token_rotation()
+                    else: # only YRot is given, the last boolean is not allowed
+                        return
                 else:
                     check_for_blocks = self.token_bool_or_options("facing")
                     if not check_for_blocks: # if using facing
