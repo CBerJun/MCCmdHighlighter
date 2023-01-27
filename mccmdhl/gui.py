@@ -38,7 +38,7 @@ class MCCommandHighlighter:
             TokenType.option: {"foreground": "DarkOrange"},
             TokenType.number: {"foreground": "LimeGreen"},
             TokenType.string: {"foreground": "DimGray"},
-            TokenType.boolean: {"foreground": "SeaGreen"},
+            TokenType.boolean: {"foreground": "LimeGreen"},
             TokenType.selector: {"foreground": "DarkViolet"},
             TokenType.scoreboard: {
                 "foreground": "DarkBlue", "font": font_scb
