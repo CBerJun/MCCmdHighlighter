@@ -32,9 +32,6 @@ class CommandTokenizer(Tokenizer):
         else:
             self.token_command()
     
-    def command_not_end(self):
-        return self.current_char != "\n" and self.current_char != self.EOF
-    
     @staticmethod
     def is_number(char: str):
         return char == "-" or char == "+" or char.isdigit()
@@ -78,13 +75,7 @@ class CommandTokenizer(Tokenizer):
         return False
 
     def skip_line(self):
-        # skip the whole line
-        res = ""
-        while self.command_not_end():
-            res += self.current_char
-            self.forward()
-        res = res.rstrip()
-        return res
+        return super().skip_line().rstrip()
     
     def expect(self, func, token: Token):
         try:
@@ -341,7 +332,7 @@ class CommandTokenizer(Tokenizer):
         ## read argument of command
         command_method()
         ## line should end here
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token(
                 TokenType.error, Error(ErrorType.TOO_MANY_ARGS)
             ): self.skip_line()
@@ -689,61 +680,61 @@ class CommandTokenizer(Tokenizer):
     
     def c_ability(self):
         self.token_target()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_options("worldbuilder", "mayfly", "mute")
             self.token_boolean()
     
     def c_alwaysday(self):
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_boolean()
     
     def c_camerashake(self):
         mode = self.token_options("add", "stop")
         if mode == "add":
             self.token_target()
-            if self.command_not_end():
+            if self.line_not_end():
                 with self.create_token(TokenType.number) as tok:
                     intensity = self.expect(self.number, tok)
                     self.check_number(intensity, tok, 0, 4)
-                if self.command_not_end():
+                if self.line_not_end():
                     with self.create_token(TokenType.number) as tok:
                         self.expect(self.number, tok)
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_options("positional", "rotational")
         elif mode == "stop":
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_target()
     
     def c_clear(self):
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_target()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_namespaced_id()
-                if self.command_not_end():
+                if self.line_not_end():
                     with self.create_token(TokenType.number) as tok:
                         data = self.expect(self.integer, tok)
                         self.check_number(data, tok, -1, 2**31-1)
-                    if self.command_not_end():
+                    if self.line_not_end():
                         with self.create_token(TokenType.number) as tok:
                             maxcount = self.expect(self.integer, tok)
                             self.check_number(maxcount, tok, -1, 2**31-1)
     
     def c_clearspawnpoint(self):
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_target()
     
     def c_clone(self):
         CLONEMODES = ("force", "move", "normal")
         for _ in range(3):
             self.token_full_pos()
-        if self.command_not_end():
+        if self.line_not_end():
             maskmode = self.token_options("masked", "replace", "filtered")
             if maskmode == "filtered":
                 self.token_options(*CLONEMODES)
                 self.token_namespaced_id()
                 self.token_bs_or_data()
             else:
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_options(*CLONEMODES)
     
     def c_damage(self):
@@ -751,10 +742,10 @@ class CommandTokenizer(Tokenizer):
         with self.create_token(TokenType.number) as tok:
             amount = self.expect(self.integer, tok)
             self.check_number(amount, tok, 0, 2**31-1)
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token(TokenType.string) as tok:
                 self.expect(self.word, tok) # damage cause
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_options("entity")
                 self.token_target()
     
@@ -766,11 +757,11 @@ class CommandTokenizer(Tokenizer):
         self.token_target() # npc
         if mode == "change":
             self.token_string() # sceneName
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_target() # players
         elif mode == "open":
             self.token_target() # player
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_string() # sceneName
     
     def c_difficulty(self):
@@ -793,15 +784,15 @@ class CommandTokenizer(Tokenizer):
                 return
             elif effect is not None: # make sure no error happens
                 tok.type = TokenType.string
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token(TokenType.number) as tok:
                 seconds = self.expect(self.integer, tok)
                 self.check_number(seconds, tok, 0, 2**31-1)
-            if self.command_not_end():
+            if self.line_not_end():
                 with self.create_token(TokenType.number) as tok:
                     amplifier = self.expect(self.integer, tok)
                     self.check_number(amplifier, tok, 0, 255)
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_boolean()
     
     def c_enchant(self):
@@ -813,7 +804,7 @@ class CommandTokenizer(Tokenizer):
             else:
                 tok.type = TokenType.string
                 self.expect(self.namespaced_id, tok)
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token(TokenType.number) as tok:
                 self.expect(self.integer, tok) # level
     
@@ -827,11 +818,11 @@ class CommandTokenizer(Tokenizer):
 
     def c_execute(self):
         subcmd = None
-        if not self.command_not_end():
+        if not self.line_not_end():
             with self.create_token(
                 TokenType.error, Error(ErrorType.EXP_EXECUTE_SUBCMD)
             ): pass
-        while self.command_not_end():
+        while self.line_not_end():
             subcmd = self.token_options(
                 "align", "anchored", "as", "at", "facing", "in",
                 "positioned", "rotated", "run", "if", "unless"
@@ -924,15 +915,15 @@ class CommandTokenizer(Tokenizer):
         for _ in range(2):
             self.token_full_pos()
         self.token_namespaced_id()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_bs_or_data()
-            if self.command_not_end():
+            if self.line_not_end():
                 mode = self.token_options(
                     "destroy", "hollow", "keep", "outline", "replace"
                 )
-                if mode == "replace" and self.command_not_end():
+                if mode == "replace" and self.line_not_end():
                     self.token_namespaced_id()
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_bs_or_data()
     
     def c_fog(self):
@@ -960,14 +951,14 @@ class CommandTokenizer(Tokenizer):
     
     def c_gamemode(self):
         self.token_gamemode_option()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_target()
     
     def c_gamerule(self):
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token(TokenType.string) as tok:
                 self.expect(self.word, tok)
-            if self.command_not_end():
+            if self.line_not_end():
                 with self.create_token() as tok:
                     if self.next_is_number():
                         tok.type = TokenType.number
@@ -979,19 +970,19 @@ class CommandTokenizer(Tokenizer):
     def c_give(self):
         self.token_target()
         self.token_namespaced_id() # item
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token(TokenType.number) as tok:
                 amount = self.expect(self.integer, tok)
                 self.check_number(amount, tok, 1, 32767)
-            if self.command_not_end():
+            if self.line_not_end():
                 with self.create_token(TokenType.number) as tok:
                     data = self.expect(self.integer, tok)
                     self.check_number(data, tok, 0, 32767)
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_json("object") # component
     
     def c_help(self):
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token() as tok:
                 if self.next_is_number():
                     tok.type = TokenType.number
@@ -1001,7 +992,7 @@ class CommandTokenizer(Tokenizer):
                     self.expect(self.word, tok)
 
     def c_immutableworld(self):
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_boolean()
     
     def c_kick(self):
@@ -1009,7 +1000,7 @@ class CommandTokenizer(Tokenizer):
         self.skip_line() # reason (optional)
     
     def c_kill(self):
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_target()
     
     def c_list(self):
@@ -1021,7 +1012,7 @@ class CommandTokenizer(Tokenizer):
             self.token_namespaced_id()
         elif mode == "structure":
             self.token_namespaced_id()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_boolean()
     
     def c_loot(self):
@@ -1051,7 +1042,7 @@ class CommandTokenizer(Tokenizer):
         elif source_mode == "loot":
             self.token_string() # loot table
         # mainhand | offhand | string (a tool)
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token() as tok:
                 tool = self.expect(self.string, tok)
                 if tool == "mainhand" or tool == "offhand":
@@ -1064,7 +1055,7 @@ class CommandTokenizer(Tokenizer):
     
     def c_mobevent(self):
         self.token_namespaced_id()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_boolean()
     
     def c_tell(self):
@@ -1083,14 +1074,14 @@ class CommandTokenizer(Tokenizer):
                 self.check_number(fade, tok, 0, 10)
         if mode == "play" or mode == "queue":
             self.token_string()
-            if self.command_not_end():
+            if self.line_not_end():
                 _volumn()
-                if self.command_not_end():
+                if self.line_not_end():
                     _fade()
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_options("play_once", "loop")
         elif mode == "stop":
-            if self.command_not_end():
+            if self.line_not_end():
                 _fade()
         elif mode == "volumn":
             _volumn()
@@ -1100,37 +1091,37 @@ class CommandTokenizer(Tokenizer):
     
     def c_particle(self):
         self.token_namespaced_id()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_full_pos()
     
     def c_playanimation(self):
         self.token_target()
         self.token_string() # animation
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_string() # next state
-            if self.command_not_end():
+            if self.line_not_end():
                 with self.create_token(TokenType.number) as tok:
                     self.expect(self.number, tok) # blend out time
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_string() # stop_expression
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_string() # controller
     
     def c_playsound(self):
         self.token_string() # sound
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_target() # player
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_full_pos() # position
-                if self.command_not_end():
+                if self.line_not_end():
                     with self.create_token(TokenType.number) as tok:
                         volumn = self.expect(self.number, tok)
                         self.check_number(volumn, tok, 0)
-                    if self.command_not_end():
+                    if self.line_not_end():
                         with self.create_token(TokenType.number) as tok:
                             pitch = self.expect(self.number, tok)
                             self.check_number(pitch, tok, 0, 256)
-                        if self.command_not_end():
+                        if self.line_not_end():
                             with self.create_token(TokenType.number) as tok:
                                 min_volumn = self.expect(self.number, tok)
                                 self.check_number(min_volumn, tok, 0)
@@ -1157,15 +1148,15 @@ class CommandTokenizer(Tokenizer):
         if using_handle_mode: # require item name
             self.token_namespaced_id()
         # [amount: int] [data: int] [components: json]
-        if self.command_not_end():
+        if self.line_not_end():
             with self.create_token(TokenType.number) as tok:
                 amount = self.expect(self.integer, tok)
                 self.check_number(amount, tok, 1, 64)
-            if self.command_not_end():
+            if self.line_not_end():
                 with self.create_token(TokenType.number) as tok:
                     data = self.expect(self.integer, tok)
                     self.check_number(data, tok, 0, 32767)
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_json("object")
     
     def c_ride(self):
@@ -1176,25 +1167,25 @@ class CommandTokenizer(Tokenizer):
         )
         if mode == "start_riding":
             self.token_target()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_options("teleport_ride", "teleport_rider")
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_options("if_group_fits", "until_full")
         elif mode == "summon_rider":
             self.token_namespaced_id() # entityType
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_spawn_event() # spawnEvent
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_string() # nameTag
         elif mode == "summon_ride":
             self.token_namespaced_id() # entityType
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_options(
                     "skip_riders", "no_ride_change", "reassign_rides"
                 )
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_spawn_event() # spawnEvent
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_string() # nameTag
     
     def c_save(self):
@@ -1238,7 +1229,7 @@ class CommandTokenizer(Tokenizer):
             if submode == "add":
                 self.token_scoreboard()
                 self.token_options("dummy")
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_string() # display name
             elif submode == "remove":
                 self.token_scoreboard()
@@ -1246,9 +1237,9 @@ class CommandTokenizer(Tokenizer):
                 display_mode = self.token_options(
                     "list", "sidebar", "belowname"
                 )
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_scoreboard()
-                    if self.command_not_end():
+                    if self.line_not_end():
                         if display_mode == "list" or display_mode == "sidebar":
                             self.token_options("ascending", "descending")
         elif mode == "players":
@@ -1261,7 +1252,7 @@ class CommandTokenizer(Tokenizer):
                 self.token_scoreboard()
                 self.token_any_integer()
             elif submode == "list":
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_starrable_target()
             elif submode == "operation":
                 self.token_starrable_target()
@@ -1295,7 +1286,7 @@ class CommandTokenizer(Tokenizer):
                         tok.value = Error(ErrorType.IMPOSSIBLE_RANDOM)
             elif submode == "reset":
                 self.token_starrable_target()
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_scoreboard()
             elif submode == "test":
                 self.token_starrable_target()
@@ -1306,7 +1297,7 @@ class CommandTokenizer(Tokenizer):
                         min_ = None
                     else:
                         min_ = self.expect(self.integer, tok)
-                if self.command_not_end():
+                if self.line_not_end():
                     with self.create_token(TokenType.number) as tok:
                         if self.current_char == "*":
                             self.char("*")
@@ -1323,9 +1314,9 @@ class CommandTokenizer(Tokenizer):
     def c_setblock(self):
         self.token_full_pos()
         self.token_namespaced_id()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_bs_or_data()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_options("destroy", "keep", "replace")
     
     def c_setmaxplayers(self):
@@ -1334,13 +1325,13 @@ class CommandTokenizer(Tokenizer):
             self.check_number(value, tok, 1, 30)
     
     def c_setworldspawn(self):
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_full_pos()
     
     def c_spawnpoint(self):
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_target()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_full_pos()
     
     def c_spreadplayers(self):
@@ -1362,7 +1353,7 @@ class CommandTokenizer(Tokenizer):
     
     def c_stopsound(self):
         self.token_target()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_string()
     
     def c_structure(self):
@@ -1371,47 +1362,47 @@ class CommandTokenizer(Tokenizer):
         if mode == "save":
             for _ in range(2):
                 self.token_full_pos()
-            if self.command_not_end():
+            if self.line_not_end():
                 entity_given = self.token_bool_or_options("memory", "disk")
-                if entity_given and self.command_not_end():
+                if entity_given and self.line_not_end():
                     self.token_options("memory", "disk")
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_boolean() # include blocks
         elif mode == "load":
             def _optional_arg2():
                 # [includeBlocks] [integrity] [seed]
                 self.token_boolean()
-                if self.command_not_end():
+                if self.line_not_end():
                     with self.create_token(TokenType.number) as tok:
                         integrity = self.expect(self.number, tok)
                         self.check_number(integrity, tok, 0, 1)
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_string() # seed
             def _optional_arg1():
                 # [<animationMode> <animationSeconds>] [<includeEntities>]
                 animate_given = not self.token_bool_or_options(
                     "block_by_block", "layer_by_layer"
                 ) # animationMode or includeEntities
-                if self.command_not_end():
+                if self.line_not_end():
                     if animate_given:
                         with self.create_token(TokenType.number) as tok:
                             animation_sec = self.expect(self.number, tok)
                             self.check_number(animation_sec, tok, 0)
-                        if self.command_not_end():
+                        if self.line_not_end():
                             self.token_boolean() # include entities
-                            if self.command_not_end():
+                            if self.line_not_end():
                                 _optional_arg2()
                     else:
                         _optional_arg2()
             
             self.token_full_pos()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_options(
                     "0_degrees", "90_degrees", "180_degrees", "270_degrees"
                 )
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_options("none", "x", "z", "xz")
-                    if self.command_not_end():
+                    if self.line_not_end():
                         _optional_arg1()
     
     def token_spawn_event(self):
@@ -1423,16 +1414,16 @@ class CommandTokenizer(Tokenizer):
 
     def c_summon(self):
         self.token_namespaced_id() # entity type
-        if self.command_not_end():
+        if self.line_not_end():
             if self.next_is_pos():
                 self.token_full_pos() # spawn pos
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_spawn_event() # spawn event
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_string() # name tag
             else:
                 self.token_string() # name tag
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_full_pos() # spawn pos
     
     def c_tag(self):
@@ -1452,7 +1443,7 @@ class CommandTokenizer(Tokenizer):
             # after target?
             # The answer is no. In Minecraft, "tp @s true" seems to be
             # understood as "teleport @s to a player named 'true'"
-            if not self.command_not_end():
+            if not self.line_not_end():
                 return
         # <target> | <position>
         # if using position:
@@ -1461,11 +1452,11 @@ class CommandTokenizer(Tokenizer):
         #  <YRot>]
         if self.next_is_pos():
             self.token_full_pos()
-            if self.command_not_end():
+            if self.line_not_end():
                 if self.next_is_rotation():
                     check_for_blocks = False
                     self.token_rotation()
-                    if self.command_not_end():
+                    if self.line_not_end():
                         self.token_rotation()
                     else: # only YRot is given, the last boolean is not allowed
                         return
@@ -1477,13 +1468,13 @@ class CommandTokenizer(Tokenizer):
                             self.token_full_pos()
                         else:
                             self.token_target()
-                if not check_for_blocks and self.command_not_end():
+                if not check_for_blocks and self.line_not_end():
                     # [<check_for_blocks>]
                     self.token_boolean()
         else:
             self.token_target()
             # [<check_for_blocks>]
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_boolean()
     
     def c_tellraw(self):
@@ -1496,13 +1487,13 @@ class CommandTokenizer(Tokenizer):
     def c_testforblock(self):
         self.token_full_pos()
         self.token_namespaced_id() # block
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_bs_or_data()
     
     def c_testforblocks(self):
         for _ in range(3):
             self.token_full_pos()
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_options("masked", "all")
     
     def c_tickingarea(self):
@@ -1516,9 +1507,9 @@ class CommandTokenizer(Tokenizer):
             else:
                 self.token_options("circle")
                 self.token_circle()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_string() # name
-                if self.command_not_end():
+                if self.line_not_end():
                     self.token_boolean() # preload
         elif mode == "remove":
             if self.next_is_pos():
@@ -1530,10 +1521,10 @@ class CommandTokenizer(Tokenizer):
                 self.token_full_pos()
             else:
                 self.token_string()
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_boolean() # preload
         elif mode == "list":
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_options("all-dimensions")
     
     def c_time(self):
@@ -1576,10 +1567,10 @@ class CommandTokenizer(Tokenizer):
             self.token_string() # identifier
             self.token_full_pos() # from
             self.token_full_pos() # to
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_string() # name
         elif mode == "list":
-            if self.command_not_end():
+            if self.line_not_end():
                 self.token_options("all-dimensions")
         elif mode == "remove":
             if self.next_is_pos():
@@ -1593,7 +1584,7 @@ class CommandTokenizer(Tokenizer):
     def c_weather(self):
         mode = self.token_options("clear", "rain", "thunder", "query")
         if mode in ("clear", "rain", "thunder"):
-            if self.command_not_end():
+            if self.line_not_end():
                 with self.create_token(TokenType.number) as tok:
                     duration = self.expect(self.integer, tok)
                     self.check_number(duration, tok, 0, 1000000)
@@ -1622,7 +1613,7 @@ class CommandTokenizer(Tokenizer):
                 self.forward()
             # Now that we have detected "L", we should call `argument_end`
             self.expect(self.argument_end, tok)
-        if self.command_not_end():
+        if self.line_not_end():
             self.token_target()
 
     # TODO? /gametest /scriptevent

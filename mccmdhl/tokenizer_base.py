@@ -78,3 +78,14 @@ class Tokenizer:
     def skip_spaces(self):
         while self.current_char == " ":
             self.forward()
+    
+    def skip_line(self):
+        # skip the whole line
+        res = ""
+        while self.line_not_end():
+            res += self.current_char
+            self.forward()
+        return res
+
+    def line_not_end(self):
+        return self.current_char != "\n" and self.current_char != self.EOF

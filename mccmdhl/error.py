@@ -43,6 +43,7 @@ class ErrorType(enum.Enum):
     MULTIPLE_COLONS_IN_ID = "More than 1 colon in namespaced id"
     UNKNOWN_COMMAND = "Unknown command: {command!r}"
     TOO_MANY_ARGS = "Too many arguments"
+    TOO_MUCH_JSON = "Characters after end of JSON"
     INVALID_OPTION = "Invalid option: {option!r}; Expecting {correct}"
     INVALID_HASITEM_ARG = "Invalid hasitem argument: {arg!r}"
     HASITEM_MISSING_ITEM = '"item" argument is required for hasitem'

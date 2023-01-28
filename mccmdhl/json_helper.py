@@ -16,6 +16,12 @@ class JSONTokenizer(Tokenizer):
         if meth is None:
             raise ValueError("Invalid expect type")
         meth()
+        try:
+            self.char(self.EOF)
+        except Error:
+            with self.create_token(
+                TokenType.error, Error(ErrorType.TOO_MUCH_JSON)
+            ): self.skip_line()
         return self.tokens
     
     def expect(self, func, tok: Token):
@@ -61,7 +67,10 @@ class JSONTokenizer(Tokenizer):
             except Error:
                 break
             else: # JSON does not allow trailing comma
-                continue
+                if self.current_char == "]":
+                    with self.create_token(
+                        TokenType.error, Error(ErrorType.TRAILING_COMMA)
+                    ): pass
         self.expect_char("]")
     
     def token_object(self):
@@ -77,7 +86,10 @@ class JSONTokenizer(Tokenizer):
             except Error:
                 break
             else: # JSON does not allow trailing comma
-                continue
+                if self.current_char == "}":
+                    with self.create_token(
+                        TokenType.error, Error(ErrorType.TRAILING_COMMA)
+                    ): pass
         self.expect_char("}")
     
     def char(self, char):
@@ -126,19 +138,20 @@ class JSONTokenizer(Tokenizer):
     def try_token_constant(self):
         # try to read true or false, return if success
         # NOTE constant "null" seems to be deprecated in Minecraft
-        for const in ("true", "false"):
-            LC = len(const)
-            if self.current_char != const[0]:
-                continue
-            for i in range(LC - 1):
-                if self.peek(i) != const[i + 1]:
-                    break
-            else: # if find it IS a const
-                with self.create_token(TokenType.boolean):
-                    for _ in range(LC):
-                        self.forward()
-                self.skip_spaces()
-                return True
+        ## Peek the next word
+        next_word = ""
+        i = 0
+        p = self.current_char
+        while p.isalnum():
+            next_word += p
+            p = self.peek(i)
+            i += 1
+        if next_word in ("true", "false"):
+            with self.create_token(TokenType.boolean):
+                for _ in range(i):
+                    self.forward()
+            self.skip_spaces()
+            return True
         return False
 
 if __name__ == "__main__":
