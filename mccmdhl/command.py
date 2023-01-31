@@ -483,7 +483,7 @@ class CommandTokenizer(Tokenizer):
                     self.expect_char("=")
                     if arg in ("r", "rm"):
                         with self.create_token(TokenType.number) as tok:
-                            r = self.expect(self.integer, tok)
+                            r = self.expect(self.number, tok)
                             self.check_number(r, tok, 0)
                     if arg in (
                         "dx", "dy", "dz", "rx", "rxm", "ry", "rym"
