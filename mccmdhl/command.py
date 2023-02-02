@@ -945,7 +945,7 @@ class CommandTokenizer(Tokenizer):
                     tok.value = Error(ErrorType.INVALID_GAMEMODE_ID)
         else:
             self.token_options(
-                "s", "c", "a", "d", "survival", "default"
+                "s", "c", "a", "d", "survival", "default",
                 "creative", "adventure"
             )
     
