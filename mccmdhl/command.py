@@ -877,7 +877,8 @@ class CommandTokenizer(Tokenizer):
                 if testcmd == "block":
                     self.token_full_pos()
                     self.token_namespaced_id()
-                    self.token_bs_or_data()
+                    if self.current_char == "[" or self.next_is_number():
+                        self.token_bs_or_data()
                 elif testcmd == "blocks":
                     for _ in range(3):
                         self.token_full_pos()
