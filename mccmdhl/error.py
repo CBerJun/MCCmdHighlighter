@@ -1,7 +1,7 @@
-# Error definitions for Minecraft Command Tokenizer
+# Error & Warning definitions for Minecraft Command Tokenizer
 import enum
 
-__all__ = ["ErrorType", "Error"]
+__all__ = ["ErrorType", "Error", "WarningType"]
 
 class ErrorType(enum.Enum):
     EXP_TERMINATING_CHAR = "Expecting a terminating character"
@@ -63,3 +63,10 @@ class Error(Exception):
     
     def __str__(self) -> str:
         return self.type.value.format(**self.error_kwargs)
+
+class WarningType(enum.Enum):
+    BLOCK_DATA = "Block data is deprecated since 1.19.70; " \
+        "Use block state instead"
+    
+    def __str__(self) -> str:
+        return self.value

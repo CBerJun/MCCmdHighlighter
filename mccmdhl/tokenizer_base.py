@@ -1,6 +1,8 @@
 import enum
 import contextlib
 
+from .error import WarningType
+
 __all__ = ["Token", "TokenType", "Tokenizer"]
 
 class Token:
@@ -27,6 +29,7 @@ class TokenType(enum.Enum):
     tag = 9 # Tag name
     pos = 10 # Position like "~1" or "^" or "3.2"
     error = 11 # Unexpected
+    warning = 12 # Weak `error`
 
 class Tokenizer:
     EOF = "\x04"
@@ -38,6 +41,7 @@ class Tokenizer:
         self.current_col = col_start - 1
         self.current_char = None
         self.tokens = [] # Result of tokenizing
+        self.warnings = [] # Store warning `Token`s
         self.forward()
     
     @property
@@ -54,6 +58,13 @@ class Tokenizer:
         tok.pos_end = self.current_index
         assert tok.type is not None
         self.tokens.append(tok)
+    
+    def warn_at(self, token: Token, type_: WarningType):
+        # Create a warning at `token`
+        self.warnings.append(Token(
+            TokenType.warning, token.pos_begin, token.pos_end,
+            value=type_
+        ))
     
     def forward(self):
         # Update position

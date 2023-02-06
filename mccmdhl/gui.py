@@ -9,7 +9,7 @@ from mccmdhl.command import TokenType, CommandTokenizer
 __all__ = ["MCCommandHighlighter"]
 
 class MCCommandHighlighter:
-    ERROR_FORMAT = "{pos_begin}-{pos_end}: {message}"
+    ERROR_FORMAT = "[{pos_begin}-{pos_end};{level}] {message}"
 
     def __init__(self, text: tkinter.Text, set_error_msg):
         # set_error_msg:function; Whenever error message changes, this is
@@ -40,16 +40,11 @@ class MCCommandHighlighter:
             TokenType.string: {"foreground": "DimGray"},
             TokenType.boolean: {"foreground": "LimeGreen"},
             TokenType.selector: {"foreground": "DarkViolet"},
-            TokenType.scoreboard: {
-                "foreground": "DarkBlue", "font": font_scb
-            },
-            TokenType.tag: {
-                "foreground": "Blue", "font": font_tag
-            },
+            TokenType.scoreboard: {"foreground": "DarkBlue", "font": font_scb},
+            TokenType.tag: {"foreground": "Blue", "font": font_tag},
             TokenType.pos: {"foreground": "DarkTurquoise"},
-            TokenType.error: {
-                "foreground": "Red", "underline": True
-            }
+            TokenType.error: {"foreground": "Red", "underline": True},
+            TokenType.warning: {"background": "Yellow"}
         }
         self.update_font()
     
@@ -65,10 +60,16 @@ class MCCommandHighlighter:
     
     def errmsg_from_token(self, token):
         # get error message from token
-        assert token.type is TokenType.error
+        if token.type is TokenType.error:
+            lv = "E"
+        elif token.type is TokenType.warning:
+            lv = "W"
+        else:
+            raise ValueError
         return self.ERROR_FORMAT.format(
             pos_begin = token.pos_begin,
             pos_end = token.pos_end,
+            level = lv,
             message = str(token.value)
         )
 
@@ -100,17 +101,17 @@ class MCCommandHighlighter:
         index1, index2 = "%s.0" % line_start, "%s.end" % line_end
         src = self.text.get(index1, index2)
         tokenizer = CommandTokenizer(src, line_start, 0)
-        tokens = tokenizer.get_tokens()
+        all_tokens = tokenizer.get_tokens() + tokenizer.get_warnings()
         ## remove old
         for tok_type in self.TOKEN2FORMAT:
             self.text.tag_remove(tok_type.name, index1, index2)
         ## update
         cursor_line = self.lineno_from_index(self.text.index("insert"))
         error_tok = None
-        for token in tokens:
+        for token in all_tokens:
             # Update error message if token is error
             pos_end = token.pos_end
-            if token.type is TokenType.error:
+            if token.type in (TokenType.error, TokenType.warning):
                 # Update error message, if user's cursor is at this line
                 if self.lineno_from_index(token.pos_begin) == cursor_line and \
                     error_tok == None:

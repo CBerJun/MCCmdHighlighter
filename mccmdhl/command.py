@@ -15,6 +15,9 @@ class CommandTokenizer(Tokenizer):
     def get_tokens(self):
         return self.tokens
     
+    def get_warnings(self):
+        return self.warnings
+    
     def file(self):
         # the whole mcfunction file
         while self.current_char != self.EOF:
@@ -599,6 +602,7 @@ class CommandTokenizer(Tokenizer):
             with self.create_token(TokenType.number) as tok:
                 data = self.expect(self.integer, tok)
             self.check_number(data, tok, -1, 32767)
+            self.warn_at(tok, type_=WarningType.BLOCK_DATA)
         elif self.current_char == "[": # block state
             self.token_blockstate()
         else:
