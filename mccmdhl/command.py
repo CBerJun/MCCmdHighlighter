@@ -7,11 +7,12 @@ from mccmdhl.error import *
 __all__ = ["CommandTokenizer"]
 
 class CommandTokenizer(Tokenizer):
-
-    def get_tokens(self):
-        # get all the tokens
-        self.tokens = []
+    
+    def __init__(self, src: str, lineno_start=1, col_start=0) -> None:
+        super().__init__(src, lineno_start, col_start)
         self.file()
+    
+    def get_tokens(self):
         return self.tokens
     
     def file(self):

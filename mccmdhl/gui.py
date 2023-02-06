@@ -109,22 +109,18 @@ class MCCommandHighlighter:
         error_tok = None
         for token in tokens:
             # Update error message if token is error
+            pos_end = token.pos_end
             if token.type is TokenType.error:
                 # Update error message, if user's cursor is at this line
                 if self.lineno_from_index(token.pos_begin) == cursor_line and \
                     error_tok == None:
                     error_tok = token
+                if token.pos_begin == token.pos_end:
+                    # Some of the errors' length is 0 (e.g. from 1.20 to
+                    # 1.20), but we still want to show them. So give these errors
+                    # one more column
+                    pos_end += "+1c"
             # Add tag
-            if token.type is TokenType.error and \
-                token.pos_begin == token.pos_end:
-                # Some of the errors' length is 0 (e.g. from 1.20 to
-                # 1.20), but we still want to show them. So give these errors
-                # one more column
-                end_lineno, end_col = token.pos_end.split(".")
-                end_col = str(int(end_col) + 1)
-                pos_end = "%s.%s" % (end_lineno, end_col)
-            else:
-                pos_end = token.pos_end
             self.text.tag_add(token.type.name, token.pos_begin, pos_end)
         self.error_set(error_tok)
 
