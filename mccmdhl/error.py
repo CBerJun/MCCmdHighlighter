@@ -67,6 +67,5 @@ class Error(Exception):
 class WarningType(enum.Enum):
     BLOCK_DATA = "Block data is deprecated since 1.19.70; " \
         "Use block state instead"
-    
-    def __str__(self) -> str:
-        return self.value
+    NO_PERMISSION = "Function files can't execute /{command} because they " \
+        "don't have enough permission level."

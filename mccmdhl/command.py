@@ -315,19 +315,21 @@ class CommandTokenizer(Tokenizer):
         # one command
         ## read command name
         with self.create_token(TokenType.command) as tok:
+            # Get the command
             command = self.expect(self.word, tok)
             if command is None:
                 tok.type = TokenType.error
                 tok.value = Error(ErrorType.EXP_COMMAND)
                 self.skip_line()
                 return
-            # handle alias
             ALIAS = {
                 "?": "help", "connect": "wsserver", "daylock": "alwaysday",
                 "msg": "tell", "w": "tell", "tp": "teleport",
                 "wb": "worldbuilder"
             }
+            raw_command = command
             command = ALIAS.get(command, command)
+            # Parse arguments
             command_method = getattr(self, "c_%s" % command, None)
             if command_method is None:
                 tok.type = TokenType.error
@@ -335,6 +337,11 @@ class CommandTokenizer(Tokenizer):
                 self.skip_line()
                 return
             tok.value = command
+        ## check if function can executes this command
+        if command in (
+            "connect", "deop", "op", "setmaxplayers", "whitelist", "save"
+        ):
+            self.warn_at(tok, WarningType.NO_PERMISSION, command=raw_command)
         ## read argument of command
         command_method()
         ## line should end here
