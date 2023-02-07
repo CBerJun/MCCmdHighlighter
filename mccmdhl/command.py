@@ -339,7 +339,8 @@ class CommandTokenizer(Tokenizer):
             tok.value = command
         ## check if function can executes this command
         if command in (
-            "connect", "deop", "op", "setmaxplayers", "whitelist", "save"
+            "connect", "deop", "op", "setmaxplayers", "whitelist",
+            "save", "reload"
         ):
             self.warn_at(tok, WarningType.NO_PERMISSION, command=raw_command)
         ## read argument of command
@@ -1136,7 +1137,10 @@ class CommandTokenizer(Tokenizer):
                             with self.create_token(TokenType.number) as tok:
                                 min_volumn = self.expect(self.number, tok)
                                 self.check_number(min_volumn, tok, 0)
-
+    
+    def c_reload(self):
+        pass
+    
     def c_replaceitem(self):
         mode = self.token_options("block", "entity")
         if mode == "block":
