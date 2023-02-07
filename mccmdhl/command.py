@@ -258,8 +258,10 @@ class CommandTokenizer(Tokenizer):
         return res
     
     def number_range(self):
-        # a number range like "2", "-1..", "3..5"
+        # a number range like "2", "-1..", "!3..+5"
         start, end = None, None
+        if self.current_char == "!":
+            self.char("!")
         if self.next_is_number():
             start = self.raw_integer()
         using_dot = self.skip_space_until(lambda c: c == ".")
@@ -363,8 +365,6 @@ class CommandTokenizer(Tokenizer):
                         tok.value = Error(ErrorType.UNCLOSED_BRACE)
                         return
                 self.expect_char("=")
-                if self.current_char == "!":
-                    self.forward()
                 with self.create_token(TokenType.number) as tok:
                     self.expect(self.number_range, tok)
                 try:
@@ -410,8 +410,6 @@ class CommandTokenizer(Tokenizer):
                         value = self.expect(self.integer, tok)
                         self.check_number(value, tok, 0, 2**15-1)
                 elif arg in ("quantity", "slot"):
-                    if self.current_char == "!":
-                        self.forward()
                     with self.create_token(TokenType.number) as tok:
                         self.expect(self.number_range, tok)
                 elif arg == "location":
@@ -502,11 +500,11 @@ class CommandTokenizer(Tokenizer):
                             self.check_number(l, tok, 0)
                     elif arg in ("name", "family"):
                         if self.current_char == "!":
-                            self.forward() # skip "!" if exists
+                            self.char("!") # skip "!" if exists
                         self.token_string()
                     elif arg == "type":
                         if self.current_char == "!":
-                            self.forward()
+                            self.char("!")
                         self.token_namespaced_id()
                     elif arg in ("x", "y", "z"):
                         with self.create_token(TokenType.pos) as tok:
@@ -520,7 +518,7 @@ class CommandTokenizer(Tokenizer):
                         _handle_scores()
                     elif arg == "tag":
                         if self.current_char == "!":
-                            self.forward() # skip "!" if exists
+                            self.char("!") # skip "!" if exists
                         # NOTE tag accepts empty argument like "@a[tag=]"
                         if not self.next_is_terminating_char() or \
                             self.current_char == '"':
