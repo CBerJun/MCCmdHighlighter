@@ -3,7 +3,7 @@ import contextlib
 
 from .error import WarningType
 
-__all__ = ["Token", "TokenType", "Tokenizer"]
+__all__ = ["Token", "TokenType", "Tokenizer", "WarningToken"]
 
 class Token:
     def __init__(self, type, pos_begin, pos_end, value) -> None:
@@ -29,7 +29,16 @@ class TokenType(enum.Enum):
     tag = 9 # Tag name
     pos = 10 # Position like "~1" or "^" or "3.2"
     error = 11 # Unexpected
-    warning = 12 # Weak `error`
+    warning = 12 # Understood, but probably wrong
+
+class WarningToken(Token):
+    def __init__(self, pos_begin, pos_end, type_: WarningType, **kwargs):
+        self.type = type_
+        self.warning_kwargs = kwargs
+        super().__init__(TokenType.warning, pos_begin, pos_end, str(self))
+    
+    def __str__(self) -> str:
+        return self.type.value.format(**self.warning_kwargs)
 
 class Tokenizer:
     EOF = "\x04"
@@ -59,11 +68,10 @@ class Tokenizer:
         assert tok.type is not None
         self.tokens.append(tok)
     
-    def warn_at(self, token: Token, type_: WarningType):
+    def warn_at(self, token: Token, type_: WarningType, **kwargs):
         # Create a warning at `token`
-        self.warnings.append(Token(
-            TokenType.warning, token.pos_begin, token.pos_end,
-            value=type_
+        self.warnings.append(WarningToken(
+            token.pos_begin, token.pos_end, type_, **kwargs
         ))
     
     def forward(self):
