@@ -89,13 +89,6 @@ class CommandTokenizer(Tokenizer):
             token.value = err
             return None
     
-    def expect_char(self, char: str):
-        try:
-            self.char(char)
-        except Error as err:
-            with self.create_token(TokenType.error, err):
-                pass
-    
     def check_number(self, number: int, tok: Token, min: int, max: int = None):
         # check the range of number
         if number is None:
@@ -148,11 +141,6 @@ class CommandTokenizer(Tokenizer):
             raise Error(ErrorType.NUMLIKE_WORD)
         return res
     
-    def raw_char(self, char: str):
-        if self.current_char != char:
-            raise Error(ErrorType.EXP_CHAR, char=char)
-        self.forward()
-    
     def raw_integer(self):
         res = ""
         if self.current_char == "-" or self.current_char == "+":
@@ -197,7 +185,7 @@ class CommandTokenizer(Tokenizer):
                 self.forward() # skip "\\"
                 self.forward() # skip '"'
                 continue
-            if self.current_char == self.EOF:
+            if not self.line_not_end():
                 raise Error(ErrorType.UNCLOSED_STRING)
             self.forward()
         self.raw_char('"') # skip last '"'
@@ -283,10 +271,6 @@ class CommandTokenizer(Tokenizer):
             raise Error(ErrorType.EXP_BOOL)
         self.argument_end()
     
-    def char(self, char: str):
-        self.raw_char(char)
-        self.skip_spaces()
-    
     def pos(self):
         # one dimension of postion
         # e.g. "-3.1", "~2", "^"
@@ -361,54 +345,23 @@ class CommandTokenizer(Tokenizer):
         # selector or player name
         def _handle_scores():
             # just to decrease indentation :)
-            self.expect_char("{")
-            while True:
-                self.skip_spaces() # allow spaces before arguments
+            for _ in self.token_list("{", "}", allow_empty=False):
                 with self.create_token(TokenType.scoreboard) as tok:
                     # NOTE scores allow quoted string as key!!!
                     # e.g. @a[scores={"xxx"=1}]
                     self.expect(self.string, tok)
-                    if self.current_char == self.EOF:
-                        tok.type = TokenType.error
-                        tok.value = Error(ErrorType.UNCLOSED_BRACE)
-                        return
                 self.expect_char("=")
                 with self.create_token(TokenType.number) as tok:
                     self.expect(self.number_range, tok)
-                try:
-                    self.char(",")
-                except Error:
-                    break # if couldn't find char ","
-                else:
-                    # since MC does not allow trailing comma,
-                    # "," means there must be more arguments
-                    continue
-            self.forward() # skip "}"
     
         def _hasitem_component():
             # just to decrease indentation :)
             # One object quoted by {} in hasitem
-            self.expect_char("{")
             args = []
-            while True:
-                self.skip_spaces() # allow spaces before arguments
-                with self.create_token(TokenType.option) as tok:
-                    arg = self.expect(self.word, tok)
-                    if self.current_char == self.EOF:
-                        tok.type = TokenType.error
-                        tok.value = Error(ErrorType.UNCLOSED_BRACE)
-                        return
-                    if arg is None:
-                        self.skip_line()
-                        return
-                    if arg not in (
-                        "item", "data", "quantity", "location", "slot"
-                    ):
-                        tok.type = TokenType.error
-                        tok.value = Error(
-                            ErrorType.INVALID_HASITEM_ARG, arg=arg
-                        )
-                        return
+            for _ in self.token_list("{", "}", allow_empty=False):
+                arg = self.token_options(
+                    "item", "data", "quantity", "location", "slot"
+                )
                 args.append(arg)
                 self.expect_char("=")
                 if arg == "item":
@@ -423,13 +376,6 @@ class CommandTokenizer(Tokenizer):
                 elif arg == "location":
                     with self.create_token(TokenType.string) as tok:
                         self.expect(self.word, tok)
-                try:
-                    self.char(",")
-                except Error:
-                    break # if couldn't find char ","
-                else: # to disallow trailing comma
-                    continue
-            self.expect_char("}")
             if "item" not in args:
                 with self.create_token(
                     TokenType.error, Error(ErrorType.HASITEM_MISSING_ITEM)
@@ -437,16 +383,8 @@ class CommandTokenizer(Tokenizer):
         
         def _handle_hasitem():
             if self.current_char == "[":
-                self.expect_char("[")
-                while True:
+                for _ in self.token_list("[", "]", allow_empty=False):
                     _hasitem_component()
-                    try:
-                        self.char(",")
-                    except Error:
-                        break
-                    else: # disallow trailing comma
-                        continue
-                self.expect_char("]")
             else:
                 _hasitem_component()
 
@@ -465,31 +403,13 @@ class CommandTokenizer(Tokenizer):
                     tok.type = TokenType.error
                     tok.value = Error(ErrorType.INVALID_SELECTOR_TYPE, var=var)
             if self.current_char == "[":
-                self.forward() # skip "["
-                while True:
-                    self.skip_spaces() # allow spaces before arguments
-                    with self.create_token(TokenType.option) as tok:
-                        arg = self.expect(self.word, tok)
-                        if arg is None:
-                            self.skip_line()
-                            return
-                        if self.current_char == self.EOF:
-                            tok.type = TokenType.error
-                            tok.value = Error(ErrorType.UNCLOSED_BRACKET)
-                            return
-                        if arg not in (
-                            "x", "y", "z", "dx", "dy", "dz", "r", "rm",
-                            "scores", "tag", "name", "type", "family", "rx",
-                            "rxm", "ry", "rym", "hasitem", "l", "lm", "m", "c"
-                        ):
-                            self.skip_line()
-                            # we don't know what should be after an unknown
-                            # arg, so we skip the remaining line
-                            tok.type = TokenType.error
-                            tok.value = Error(
-                                ErrorType.INVALID_SELECTOR_ARG, arg=arg
-                            )
-                            return
+                for _ in self.token_list("[", "]", allow_empty=False):
+                # We have tested that `@e[]` is not a valid selector
+                    arg = self.token_options(
+                        "x", "y", "z", "dx", "dy", "dz", "r", "rm",
+                        "scores", "tag", "name", "type", "family", "rx",
+                        "rxm", "ry", "rym", "hasitem", "l", "lm", "m", "c"
+                    )
                     self.expect_char("=")
                     if arg in ("r", "rm"):
                         with self.create_token(TokenType.number) as tok:
@@ -536,13 +456,6 @@ class CommandTokenizer(Tokenizer):
                         _handle_hasitem()
                     elif arg == "m":
                         self.token_gamemode_option()
-                    try:
-                        self.char(",")
-                    except Error:
-                        break # if couldn't find char ","
-                    else:
-                        continue # to disallow trailing comma
-                self.expect_char("]")
         self.skip_spaces()
     
     def token_options(self, *options):
@@ -571,9 +484,7 @@ class CommandTokenizer(Tokenizer):
     def token_blockstate(self):
         # blockstate like ["anchor": "north"]
         # only boolean, string, integer is allowed as value
-        self.expect_char("[")
-        self.skip_spaces()
-        while self.current_char != "]":
+        for _ in self.token_list("[", "]", allow_empty=True):
             with self.create_token(TokenType.option) as tok:
                 self.expect(self.quoted_string, tok)
             self.expect_char(":")
@@ -591,16 +502,6 @@ class CommandTokenizer(Tokenizer):
                     else:
                         tok.type = TokenType.error
                         tok.value = Error(ErrorType.EXP_BS_VALUE)
-            try:
-                self.char(",")
-            except Error:
-                break
-            else:
-                if self.current_char == "]":
-                    with self.create_token(
-                        TokenType.error, Error(ErrorType.TRAILING_COMMA)
-                    ): pass
-        self.expect_char("]")
 
     def token_bs_or_data(self):
         # blockstate or block data (integer)
@@ -838,9 +739,6 @@ class CommandTokenizer(Tokenizer):
                 "align", "anchored", "as", "at", "facing", "in",
                 "positioned", "rotated", "run", "if", "unless"
             )
-            if subcmd is None:
-                self.skip_line() # invalid subcommand -> end
-                break
             if subcmd == "align":
                 with self.create_token(TokenType.option) as tok:
                     axes = self.expect(self.word, tok)

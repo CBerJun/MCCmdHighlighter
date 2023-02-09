@@ -1,7 +1,7 @@
 import enum
 import contextlib
 
-from .error import WarningType
+from .error import *
 
 __all__ = ["Token", "TokenType", "Tokenizer", "WarningToken"]
 
@@ -108,3 +108,45 @@ class Tokenizer:
 
     def line_not_end(self):
         return self.current_char != "\n" and self.current_char != self.EOF
+    
+    # Utils
+    
+    def raw_char(self, char: str):
+        if self.current_char != char:
+            raise Error(ErrorType.EXP_CHAR, char=char)
+        self.forward()
+    
+    def char(self, char):
+        self.raw_char(char)
+        self.skip_spaces()
+    
+    def expect_char(self, char: str):
+        try:
+            self.char(char)
+        except Error as err:
+            with self.create_token(TokenType.error, err):
+                pass
+    
+    def token_list(self, start: str, end: str, allow_empty=True):
+        # Used as an generator, read a list of values started with `start`,
+        # seperated with comma "," and ends with `end`
+        # `allow_empty` specifies whether at least 1 element is required
+        self.expect_char(start)
+        self.skip_spaces()
+        if self.current_char == end and (not allow_empty):
+            with self.create_token(
+                TokenType.error, Error(ErrorType.AT_LEAST_ONE_ELEMENT)
+            ): self.char(end)
+            return
+        while self.current_char != end:
+            yield
+            try:
+                self.char(",")
+            except Error:
+                break
+            else: # disallow trailing comma
+                if self.current_char == end:
+                    with self.create_token(
+                        TokenType.error, Error(ErrorType.TRAILING_COMMA)
+                    ): pass
+        self.expect_char(end)

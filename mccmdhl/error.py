@@ -23,8 +23,6 @@ class ErrorType(enum.Enum):
     EXP_FUNCTION_PATH = "Expecting function path"
     EXP_SCB_OP = "Expecting one of +=, -=, *=, /=, %=, =, >, <, ><"
     UNCLOSED_STRING = "Unclosed string"
-    UNCLOSED_BRACE = "Unclosed '{{'"
-    UNCLOSED_BRACKET = "Unclosed '['"
     TRAILING_COMMA = "Trailing comma is not allowed"
     NUMBER_OUT_OF_RANGE = "Number not in range: [{min}, {max}]"
     INT_OVERFLOW = "Integer overflow"
@@ -48,12 +46,12 @@ class ErrorType(enum.Enum):
     INVALID_HASITEM_ARG = "Invalid hasitem argument: {arg!r}"
     HASITEM_MISSING_ITEM = '"item" argument is required for hasitem'
     INVALID_SELECTOR_TYPE = "Invalid selector type: {var!r}"
-    INVALID_SELECTOR_ARG = "Invalid selector argument: {arg!r}"
     INVALID_GAMEMODE_ID = "Invalid game mode id"
     LOCAL_POS_FOR_SELECTOR = "^ pos can not be used for " \
         "selector argument 'x', 'y' and 'z'"
     LOCAL_POS_WITH_RELATIVE = "~ and ^ can not be used together in postion"
     WRONG_EXECUTE_END = '"execute" must end with "run", "if" or "unless"'
+    AT_LEAST_ONE_ELEMENT = 'At least 1 element is required'
 
 class Error(Exception):
     def __init__(self, error_type: ErrorType, **kwargs) -> None:

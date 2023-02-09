@@ -32,13 +32,6 @@ class JSONTokenizer(Tokenizer):
             tok.value = err
             return None
     
-    def expect_char(self, char: str):
-        try:
-            self.char(char)
-        except Error as err:
-            with self.create_token(TokenType.error, err):
-                pass
-    
     def token_any(self):
         # Any JSON object
         if self.try_token_constant():
@@ -59,44 +52,16 @@ class JSONTokenizer(Tokenizer):
     
     def token_array(self):
         # A JSON array
-        self.expect_char("[")
-        while self.current_char != "]":
+        for _ in self.token_list("[", "]", allow_empty=True):
             self.token_any()
-            try:
-                self.char(",")
-            except Error:
-                break
-            else: # JSON does not allow trailing comma
-                if self.current_char == "]":
-                    with self.create_token(
-                        TokenType.error, Error(ErrorType.TRAILING_COMMA)
-                    ): pass
-        self.expect_char("]")
     
     def token_object(self):
         # A JSON object {...}
-        self.expect_char("{")
-        while self.current_char != "}":
+        for _ in self.token_list("{", "}", allow_empty=True):
             with self.create_token(TokenType.option) as tok:
                 self.expect(self.string, tok)
             self.expect_char(":")
             self.token_any()
-            try:
-                self.char(",")
-            except Error:
-                break
-            else: # JSON does not allow trailing comma
-                if self.current_char == "}":
-                    with self.create_token(
-                        TokenType.error, Error(ErrorType.TRAILING_COMMA)
-                    ): pass
-        self.expect_char("}")
-    
-    def char(self, char):
-        if self.current_char != char:
-            raise Error(ErrorType.EXP_CHAR, char=char)
-        self.forward() # skip char
-        self.skip_spaces()
     
     def number(self):
         # integer or floating number
@@ -128,7 +93,7 @@ class JSONTokenizer(Tokenizer):
                 self.forward()
                 self.forward()
                 continue
-            if self.current_char == self.EOF:
+            if not self.line_not_end():
                 raise Error(ErrorType.UNCLOSED_STRING)
             ## TODO more escapes
             self.forward()
