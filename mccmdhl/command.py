@@ -196,15 +196,16 @@ class CommandTokenizer(Tokenizer):
         return res
     
     def quoted_string(self):
-        self.raw_quoted_string()
+        res = self.raw_quoted_string()
         self.skip_spaces()
+        return res
     
     def string(self):
         # word or quoted string
         if self.current_char == '"':
-            self.quoted_string()
+            return self.quoted_string()
         else:
-            self.word()
+            return self.word()
         # this does not need to call `argument_end`, since
         # both `quoted_string` and `word` handle this for us
     
@@ -369,7 +370,9 @@ class CommandTokenizer(Tokenizer):
                 elif arg == "data":
                     with self.create_token(TokenType.number) as tok:
                         value = self.expect(self.integer, tok)
-                        self.check_number(value, tok, 0, 2**15-1)
+                        # Yep, range of "data" is from -32768 to 32767,
+                        # not -1 to 32767
+                        self.check_number(value, tok, -32768, 32767)
                 elif arg in ("quantity", "slot"):
                     with self.create_token(TokenType.number) as tok:
                         self.expect(self.number_range, tok)
@@ -560,10 +563,12 @@ class CommandTokenizer(Tokenizer):
         with self.create_token(TokenType.number) as tok:
             self.expect(self.integer, tok)
     
-    def token_skip_line(self, error_type = ErrorType.EXP_MESSAGE):
+    def token_skip_line(
+        self, error_type=ErrorType.EXP_MESSAGE, required=False
+    ):
         with self.create_token(TokenType.string) as tok:
             path = self.skip_line()
-            if not path:
+            if (not path) and required:
                 tok.type = TokenType.error
                 tok.value = Error(error_type)
     
@@ -594,7 +599,8 @@ class CommandTokenizer(Tokenizer):
         self.token_target()
         if self.line_not_end():
             self.token_options("worldbuilder", "mayfly", "mute")
-            self.token_boolean()
+            if self.line_not_end():
+                self.token_boolean()
     
     def c_alwaysday(self):
         if self.line_not_end():
@@ -844,7 +850,7 @@ class CommandTokenizer(Tokenizer):
         self.token_string() # userProvidedID
     
     def c_function(self):
-        self.token_skip_line(ErrorType.EXP_FUNCTION_PATH)
+        self.token_skip_line(ErrorType.EXP_FUNCTION_PATH, required=True)
     
     def token_gamemode_option(self):
         if self.next_is_number():
@@ -856,7 +862,7 @@ class CommandTokenizer(Tokenizer):
         else:
             self.token_options(
                 "s", "c", "a", "d", "survival", "default",
-                "creative", "adventure"
+                "creative", "adventure", "spectator"
             )
     
     def c_gamemode(self):
@@ -1126,7 +1132,7 @@ class CommandTokenizer(Tokenizer):
                 self.token_circle()
             elif mode == "tickingarea":
                 self.token_string() # name of tickingarea
-        self.token_skip_line(ErrorType.EXP_FUNCTION_PATH)
+        self.token_skip_line(ErrorType.EXP_FUNCTION_PATH, required=True)
     
     def token_starrable_target(self):
         if self.current_char == "*":

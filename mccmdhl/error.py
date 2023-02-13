@@ -66,4 +66,4 @@ class WarningType(enum.Enum):
     BLOCK_DATA = "Block data is deprecated since 1.19.70; " \
         "Use block state instead"
     NO_PERMISSION = "Function files can't execute /{command} because they " \
-        "don't have enough permission level."
+        "don't have enough permission level"
