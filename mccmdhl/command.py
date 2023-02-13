@@ -373,6 +373,8 @@ class CommandTokenizer(Tokenizer):
                         # Yep, range of "data" is from -32768 to 32767,
                         # not -1 to 32767
                         self.check_number(value, tok, -32768, 32767)
+                    if value and value < 0:
+                        self.warn_at(tok, WarningType.DANGEROUS_HASITEM_DATA)
                 elif arg in ("quantity", "slot"):
                     with self.create_token(TokenType.number) as tok:
                         self.expect(self.number_range, tok)
