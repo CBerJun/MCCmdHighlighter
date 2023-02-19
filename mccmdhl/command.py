@@ -29,12 +29,11 @@ class CommandTokenizer(Tokenizer):
         self.skip_spaces()
         if self.current_char == "#":
             self.token_comment()
-        elif self.current_char == "\n":
-            self.forward()
-        elif self.current_char == self.EOF:
-            pass
+        elif not self.line_not_end():
+            pass # empty line
         else:
             self.token_command()
+        self.forward() # skip \n or EOF
     
     @staticmethod
     def is_number(char: str):
@@ -737,12 +736,12 @@ class CommandTokenizer(Tokenizer):
         self.token_options("eyes", "feet")
 
     def c_execute(self):
-        subcmd = None
+        subcmd = ""
         if not self.line_not_end():
             with self.create_token(
                 TokenType.error, Error(ErrorType.EXP_EXECUTE_SUBCMD)
             ): pass
-        while self.line_not_end():
+        while self.line_not_end() and subcmd is not None:
             subcmd = self.token_options(
                 "align", "anchored", "as", "at", "facing", "in",
                 "positioned", "rotated", "run", "if", "unless"
