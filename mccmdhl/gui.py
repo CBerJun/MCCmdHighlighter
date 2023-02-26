@@ -11,11 +11,12 @@ __all__ = ["MCCommandHighlighter"]
 class MCCommandHighlighter:
     ERROR_FORMAT = "[{pos_begin}-{pos_end};{level}] {message}"
 
-    def __init__(self, text: tkinter.Text, set_error_msg):
+    def __init__(self, text: tkinter.Text, set_error_msg, version=(1, 19, 70)):
         # set_error_msg:function; Whenever error message changes, this is
         # called with 1 Token as argument, which is the error token.
         # This argument might be None when no error is found in this line
         self.text = text
+        self.version = version
         self.BASIC_FONT = TkFont(font=text.cget("font"))
         self.text_redir = WidgetRedirector(self.text)
         self.orig_ins = self.text_redir.register("insert", self.text_insert)
@@ -100,7 +101,10 @@ class MCCommandHighlighter:
         ## get tokens
         index1, index2 = "%s.0" % line_start, "%s.end" % line_end
         src = self.text.get(index1, index2)
-        tokenizer = CommandTokenizer(src, line_start, 0)
+        tokenizer = CommandTokenizer(
+            src, version=self.version,
+            lineno_start=line_start, col_start=0
+        )
         all_tokens = tokenizer.get_tokens() + tokenizer.get_warnings()
         ## remove old
         for tok_type in self.TOKEN2FORMAT:
