@@ -11,8 +11,7 @@ Also, errors are marked red and underlined.
 All errors come with a message that tells you what's wrong!
 
 ## Notice
-This project is based on Minecraft: Bedrock Edition 1.19.51.
-This project considers changes in 1.19.70.
+This project supports command in Minecraft Bedrock Edition, from 1.19.50 to 1.19.70.
 This project is still in develop and **may differ from the original command system of Minecraft in some aspects**.
 Besides, not all commands are supported.
 In specific, `/gametest` and `/scriptevent` are not supported yet.
