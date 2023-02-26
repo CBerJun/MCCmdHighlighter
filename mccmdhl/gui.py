@@ -59,6 +59,12 @@ class MCCommandHighlighter:
         for tok_type, color in self.TOKEN2FORMAT.items():
             self.text.tag_config(tok_type.name, **color)
     
+    def update_version(self, version: tuple):
+        # Update version
+        self.version = version
+        last_lineno = self.lineno_from_index(self.text.index("end"))
+        self.update_text(1, last_lineno)
+    
     def errmsg_from_token(self, token):
         # get error message from token
         if token.type is TokenType.error:
