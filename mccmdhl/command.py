@@ -3,13 +3,17 @@
 from mccmdhl.tokenizer_base import *
 from mccmdhl.json_helper import JSONTokenizer
 from mccmdhl.error import *
+from mccmdhl.version_control import *
 
 __all__ = ["CommandTokenizer"]
 
-class CommandTokenizer(Tokenizer):
+class CommandTokenizer(Tokenizer, VersionedMixin):
     
-    def __init__(self, src: str, lineno_start=1, col_start=0) -> None:
+    def __init__(
+        self, src: str, version=(1, 19, 70), lineno_start=1, col_start=0
+    ):
         super().__init__(src, lineno_start, col_start)
+        self.set_version(version)
         self.file()
     
     def get_tokens(self):
@@ -369,7 +373,8 @@ class CommandTokenizer(Tokenizer):
                 elif arg == "data":
                     # Yep, range of hasitem "data" is from -32768 to 32767,
                     # not -1 to 32767
-                    value = self.token_integer(-32768, 32767)
+                    with self.create_token(TokenType.number) as tok:
+                        value = self.expect(self.integer, tok)
                     if value and value < 0:
                         self.warn_at(tok, WarningType.DANGEROUS_HASITEM_DATA)
                 elif arg in ("quantity", "slot"):
@@ -499,19 +504,21 @@ class CommandTokenizer(Tokenizer):
                         tok.type = TokenType.error
                         tok.value = Error(ErrorType.EXP_BS_VALUE)
 
+    @versioned_method()
     def token_bs_or_data(self):
         # blockstate or block data (integer)
         if self.next_is_number(): # data value
-            with self.create_token(TokenType.number) as tok:
-                data = self.expect(self.integer, tok)
-            self.check_number(data, tok, -1, 32767)
-            self.warn_at(tok, type_=WarningType.BLOCK_DATA)
+            self.token_integer(-1, 32767)
         elif self.current_char == "[": # block state
             self.token_blockstate()
         else:
             with self.create_token(
                 TokenType.error, Error(ErrorType.EXP_BS_DV)
             ): self.skip_line()
+
+    @token_bs_or_data.variation(version=(1, 19, 70))
+    def _token_bs_or_data_1_19_70(self):
+        self.token_blockstate()
     
     def token_rotation(self):
         # one rotation like `0`, `~3`

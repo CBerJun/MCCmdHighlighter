@@ -63,10 +63,9 @@ class Error(Exception):
         return self.type.value.format(**self.error_kwargs)
 
 class WarningType(enum.Enum):
-    BLOCK_DATA = "Block data is deprecated since 1.19.70; " \
-        "Use block state instead"
     NO_PERMISSION = "Function files can't execute /{command} because they " \
         "don't have enough permission level"
     DANGEROUS_HASITEM_DATA = '"hasitem" data below 0 crashes the game ' \
         "before the 1.19.40 update (See MCPE-152314); It's recommended to " \
         'just omit the "data" entry'
+
