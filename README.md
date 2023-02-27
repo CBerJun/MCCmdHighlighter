@@ -10,8 +10,11 @@ Options in command, selector, namespaced id and number all have different colors
 Also, errors are marked red and underlined.
 All errors come with a message that tells you what's wrong!
 
+By using `update_version` method for `MCCommandHighlighter`, you can specify
+the version of command system, using a 3-tuple later than `(1, 19, 0)`.
+
 ## Notice
-This project supports command in Minecraft Bedrock Edition, from 1.19.50 to 1.19.70.
+This project supports command in Minecraft Bedrock Edition, from 1.19.0 to 1.19.70.
 This project is still in develop and **may differ from the original command system of Minecraft in some aspects**.
 Besides, not all commands are supported.
 In specific, `/gametest` and `/scriptevent` are not supported yet.

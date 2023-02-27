@@ -42,14 +42,16 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
     @staticmethod
     def is_number(char: str):
         return char == "-" or char == "+" or char.isdigit()
-
+    
+    def is_terminating_char(self, char: str):
+        # Test result in MCBE 1.19.30
+        return char in ' ,@~^/$&"\'!#%+*=[{]}\\|<>`\n' or char == self.EOF
+    
     def next_is_number(self):
         return self.is_number(self.current_char)
     
     def next_is_terminating_char(self):
-        # Test result in MCBE 1.19.30
-        return self.current_char in ' ,@~^/$&"\'!#%+*=[{]}\\|<>`\n' or \
-            self.current_char == self.EOF
+        return self.is_terminating_char(self.current_char)
     
     def next_is_pos(self):
         return (
@@ -60,6 +62,17 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
     
     def next_is_rotation(self):
         return self.next_is_number() or self.current_char == "~"
+    
+    def peek_word(self):
+        # Peek the next `word`, starting from current char
+        i = 0
+        chars = []
+        cur = self.current_char
+        while not self.is_terminating_char(cur):
+            chars.append(cur)
+            cur = self.peek(i)
+            i += 1
+        return "".join(chars)
     
     def skip_space_until(self, rule):
         # What this does:
@@ -504,7 +517,7 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
                         tok.type = TokenType.error
                         tok.value = Error(ErrorType.EXP_BS_VALUE)
 
-    @versioned_method()
+    @versioned_method(version=MIN_VERSION)
     def token_bs_or_data(self):
         # blockstate or block data (integer)
         if self.next_is_number(): # data value
@@ -739,7 +752,8 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
     
     def token_anchor_option(self):
         self.token_options("eyes", "feet")
-
+    
+    @versioned_method(version=(1, 19, 50))
     def c_execute(self):
         subcmd = ""
         if not self.line_not_end():
@@ -832,6 +846,19 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
             with self.create_token(
                 TokenType.error, Error(ErrorType.WRONG_EXECUTE_END)
             ): pass
+    
+    @c_execute.variation(version=MIN_VERSION)
+    def _c_execute_1_19_0(self):
+        # Old /execute syntax
+        # /execute <target> <pos> [detect <pos> <block> <data value>] <command>
+        self.token_target()
+        self.token_full_pos()
+        if self.peek_word() == "detect":
+            self.token_options("detect")
+            self.token_full_pos()
+            self.token_namespaced_id()
+            self.token_integer(-1, 32767)
+        self.token_command()
     
     def c_fill(self):
         for _ in range(2):

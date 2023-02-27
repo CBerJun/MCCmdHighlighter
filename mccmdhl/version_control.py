@@ -5,12 +5,13 @@ __all__ = [
     "versioned_method", "MIN_VERSION"
 ]
 
-MIN_VERSION = (1, 19, 50)
+MIN_VERSION = (1, 19, 0)
 
 class VersionedMixin:
     # A class that contains `VersionedMethod`
     def set_version(self, version: tuple):
         # The version used in this instance
+        assert MIN_VERSION <= version
         self.version = version
 
     @classmethod
@@ -31,7 +32,7 @@ class VersionedMethod:
         self.version2func = {}
         self.versions = []
 
-    def register(self, func, version=MIN_VERSION):
+    def register(self, func, version):
         """Register the function as a different version of method."""
         assert version not in self.versions
         self.version2func[version] = func
@@ -92,9 +93,9 @@ def versioned_method(*args, **kwargs):
     >>> t.foo()
     foo 1.19.50
     >>> t2 = Test((1, 19, 70))
-    >>> t.foo()
+    >>> t2.foo()
     foo 1.19.70
-    >>> t.foo_1_19_50()
+    >>> t2.foo_1_19_50()
     foo 1.19.50
     """
     res = VersionedMethod()
