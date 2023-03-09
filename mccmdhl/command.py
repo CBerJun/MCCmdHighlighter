@@ -1323,6 +1323,7 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
         else:
             self.token_namespaced_id()
 
+    @versioned_method(version=MIN_VERSION)
     def c_summon(self):
         self.token_namespaced_id() # entity type
         if self.line_not_end():
@@ -1337,6 +1338,33 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
                 if self.line_not_end():
                     self.token_full_pos() # spawn pos
     
+    @c_summon.variation(version=(1, 19, 80))
+    def _c_summon_1_19_80(self):
+        self.token_namespaced_id() # entity type
+        if self.line_not_end():
+            if self.next_is_pos():
+                self.token_full_pos()
+                def _rot_or_facing():
+                    if self.next_is_rotation():
+                        self.token_rotation()
+                        if self.line_not_end():
+                            self.token_rotation()
+                    else:
+                        self.token_options("facing")
+                        if self.next_is_pos():
+                            self.token_full_pos()
+                        else:
+                            self.token_target()
+                self.token_chained_arguments(
+                    _rot_or_facing,
+                    self.token_spawn_event,
+                    self.token_string # name
+                )
+            else:
+                self.token_string() # name tag
+                if self.line_not_end():
+                    self.token_full_pos() # spawn pos
+
     def c_tag(self):
         self.token_starrable_target()
         mode = self.token_options("add", "remove", "list")
