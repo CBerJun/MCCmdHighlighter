@@ -69,7 +69,7 @@ class VersionedMethod:
                     return self.version2func[v](instance, *args, **kwargs)
                 return _target
         else:
-            raise ValueError(
+            raise NotImplementedError(
                 "No implementation found for version %r" % (instance.version,)
             )
 

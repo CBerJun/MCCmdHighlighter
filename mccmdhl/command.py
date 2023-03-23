@@ -331,7 +331,11 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
             raw_command = command
             command = ALIAS.get(command, command)
             # Parse arguments
-            command_method = getattr(self, "c_%s" % command, None)
+            try:
+                command_method = getattr(self, "c_%s" % command, None)
+            except NotImplementedError:
+                # Can be raised by version control system
+                command_method = None
             if command_method is None:
                 tok.type = TokenType.error
                 tok.value = Error(ErrorType.UNKNOWN_COMMAND, command=command)
@@ -408,6 +412,20 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
             else:
                 _hasitem_component()
 
+        def _handle_haspermission():
+            for _ in self.token_list("{", "}", allow_empty=False):
+                self.token_permission()
+                self.expect_char("=")
+                self.token_state()
+
+        ALL_ARGS = [
+            "x", "y", "z", "dx", "dy", "dz", "r", "rm",
+            "scores", "tag", "name", "type", "family", "rx",
+            "rxm", "ry", "rym", "hasitem", "l", "lm", "m", "c"
+        ]
+        if self.version >= (1, 19, 80):
+            ALL_ARGS.append("haspermission")
+
         if self.current_char != "@":
             # a name
             with self.create_token(TokenType.selector) as tok:
@@ -425,11 +443,7 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
             if self.current_char == "[":
                 for _ in self.token_list("[", "]", allow_empty=False):
                 # We have tested that `@e[]` is not a valid selector
-                    arg = self.token_options(
-                        "x", "y", "z", "dx", "dy", "dz", "r", "rm",
-                        "scores", "tag", "name", "type", "family", "rx",
-                        "rxm", "ry", "rym", "hasitem", "l", "lm", "m", "c"
-                    )
+                    arg = self.token_options(*ALL_ARGS)
                     self.expect_char("=")
                     if arg in ("r", "rm"):
                         self.token_number(check_min=0)
@@ -471,6 +485,8 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
                         _handle_hasitem()
                     elif arg == "m":
                         self.token_gamemode_option()
+                    elif arg == "haspermission":
+                        _handle_haspermission()
         self.skip_spaces()
     
     def token_options(self, *options):
@@ -532,6 +548,12 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
     @token_bs_or_data.variation(version=(1, 19, 70))
     def _token_bs_or_data_1_19_70(self):
         self.token_blockstate()
+
+    @token_bs_or_data.variation(version=(1, 19, 80))
+    def _token_bs_or_data_1_19_80(self):
+        # Above 1.19.80, block states are optional
+        if self.current_char == "[":
+            self.token_blockstate()
     
     def token_rotation(self):
         # one rotation like `0`, `~3`
@@ -938,6 +960,25 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
     def c_immutableworld(self):
         if self.line_not_end():
             self.token_boolean()
+
+    def token_permission(self):
+        self.token_options("camera", "movement")
+
+    def token_state(self):
+        with self.create_token(TokenType.boolean) as tok:
+            state = self.expect(self.word, tok)
+            if state not in ("enabled", "disabled"):
+                tok.type = TokenType.error
+                tok.value = Error(ErrorType.EXP_STATE)
+
+    @versioned_method(version=(1, 19, 80))
+    def c_inputpermission(self):
+        mode = self.token_options("query", "set")
+        self.token_target()
+        self.token_permission()
+        # In query mode, state is optional and in set mode its required
+        if mode == "set" or self.line_not_end():
+            self.token_state()
     
     def c_kick(self):
         self.token_target()

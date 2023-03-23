@@ -22,6 +22,7 @@ class ErrorType(enum.Enum):
     EXP_EXECUTE_SUBCMD = "Expecting an execute subcommand"
     EXP_FUNCTION_PATH = "Expecting function path"
     EXP_SCB_OP = "Expecting one of +=, -=, *=, /=, %=, =, >, <, ><"
+    EXP_STATE = "Expecting a state (enabled / disabled)"
     UNCLOSED_STRING = "Unclosed string"
     TRAILING_COMMA = "Trailing comma is not allowed"
     NUMBER_OUT_OF_RANGE = "Number not in range: [{min}, {max}]"

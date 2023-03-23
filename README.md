@@ -14,7 +14,7 @@ By using `update_version` method for `MCCommandHighlighter`, you can specify
 the version of command system, using a 3-tuple later than `(1, 19, 0)`.
 
 ## Notice
-This project supports command in Minecraft Bedrock Edition, from 1.19.0 to 1.19.70.
+This project supports command in Minecraft Bedrock Edition, from 1.19.0 to 1.19.80.
 This project is still in develop and **may differ from the original command system of Minecraft in some aspects**.
 Besides, not all commands are supported.
 In specific, `/gametest` and `/scriptevent` are not supported yet.
