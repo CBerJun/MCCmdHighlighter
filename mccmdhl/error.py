@@ -43,7 +43,6 @@ class ErrorType(enum.Enum):
     TOO_MANY_ARGS = "Too many arguments"
     TOO_MUCH_JSON = "Characters after end of JSON"
     INVALID_OPTION = "Invalid option: {option!r}; Expecting {correct}"
-    INVALID_HASITEM_ARG = "Invalid hasitem argument: {arg!r}"
     HASITEM_MISSING_ITEM = '"item" argument is required for hasitem'
     INVALID_SELECTOR_TYPE = "Invalid selector type: {var!r}"
     INVALID_GAMEMODE_ID = "Invalid game mode id"
