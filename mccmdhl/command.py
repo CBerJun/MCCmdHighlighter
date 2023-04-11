@@ -484,6 +484,8 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
                     elif arg == "hasitem":
                         _handle_hasitem()
                     elif arg == "m":
+                        if self.current_char == "!":
+                            self.char("!")
                         self.token_gamemode_option()
                     elif arg == "haspermission":
                         _handle_haspermission()
