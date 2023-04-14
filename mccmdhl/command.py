@@ -197,12 +197,11 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
         # a quoted string "xxx"
         self.raw_char('"') # skip '"'
         while self.current_char != '"':
-            if self.current_char == "\\" and self.peek() == '"':
-                self.forward() # skip "\\"
-                self.forward() # skip '"'
-                continue
             if not self.line_not_end():
                 raise Error(ErrorType.UNCLOSED_STRING)
+            next_two = self.current_char + self.peek()
+            if next_two == "\\\\" or next_two == '\\"':
+                self.forward() # Forward 1 more time
             self.forward()
         self.raw_char('"') # skip last '"'
 
