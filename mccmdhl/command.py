@@ -361,6 +361,20 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
             self.forward() # skip "#"
             self.skip_line()
 
+    _selector_args = VersionedMethod()
+
+    @_selector_args.variation(version=MIN_VERSION)
+    def _selector_args_oldest(self):
+        return (
+            "x", "y", "z", "dx", "dy", "dz", "r", "rm",
+            "scores", "tag", "name", "type", "family", "rx",
+            "rxm", "ry", "rym", "hasitem", "l", "lm", "m", "c"
+        )
+
+    @_selector_args.variation(version=(1, 19, 80))
+    def _selector_args_1_19_80(self):
+        return self._selector_args_oldest() + ("haspermission",)
+
     def token_target(self):
         # selector or player name
         def _handle_scores():
@@ -417,14 +431,6 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
                 self.expect_char("=")
                 self.token_state()
 
-        ALL_ARGS = [
-            "x", "y", "z", "dx", "dy", "dz", "r", "rm",
-            "scores", "tag", "name", "type", "family", "rx",
-            "rxm", "ry", "rym", "hasitem", "l", "lm", "m", "c"
-        ]
-        if self.version >= (1, 19, 80):
-            ALL_ARGS.append("haspermission")
-
         if self.current_char != "@":
             # a name
             with self.create_token(TokenType.selector) as tok:
@@ -442,7 +448,7 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
             if self.current_char == "[":
                 for _ in self.token_list("[", "]", allow_empty=False):
                 # We have tested that `@e[]` is not a valid selector
-                    arg = self.token_options(*ALL_ARGS)
+                    arg = self.token_options(*self._selector_args())
                     self.expect_char("=")
                     if arg in ("r", "rm"):
                         self.token_number(check_min=0)
