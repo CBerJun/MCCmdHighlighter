@@ -6,7 +6,7 @@ __all__ = ["ErrorType", "Error", "WarningType"]
 class ErrorType(enum.Enum):
     EXP_TERMINATING_CHAR = "Expecting a terminating character"
     EXP_WORD = "Expecting a word"
-    EXP_ID = "Expecting an namespaced identifier"
+    EXP_ID = "Expecting a namespaced identifier"
     EXP_MESSAGE = "Expecting a message"
     EXP_CHAR = "Expecting character {char!r}"
     EXP_INTEGER = "Expecting an integer"
@@ -34,19 +34,19 @@ class ErrorType(enum.Enum):
     IMPOSSIBLE_SPREAD = "Spread range must be larger than distance"
     NUMLIKE_WORD = "A number-like word must be quoted"
     NUMLIKE_ID = "A namespaced ID can't be number-like"
-    ILLEGAL_CHAR_IN_ID = "Namespaced ID should only include " \
+    ILLEGAL_CHAR_IN_ID = "A namespaced ID should only include " \
         "a-z, 0-9, _, -, . and :"
     ILLEGAL_CHAR_IN_AXES = '"align" axes can only include character ' \
         "'x', 'y' and 'z'"
     REPEAT_CHAR_IN_AXES = "Repeat 'x', 'y' or 'z' in \"align\" axes"
-    MULTIPLE_COLONS_IN_ID = "More than 1 colon in namespaced id"
+    MULTIPLE_COLONS_IN_ID = "More than 1 colon in a namespaced ID"
     UNKNOWN_COMMAND = "Unknown command: {command!r}"
     TOO_MANY_ARGS = "Too many arguments"
     TOO_MUCH_JSON = "Characters after end of JSON"
     INVALID_OPTION = "Invalid option: {option!r}; Expecting {correct}"
     HASITEM_MISSING_ITEM = '"item" argument is required for hasitem'
     INVALID_SELECTOR_TYPE = "Invalid selector type: {var!r}"
-    INVALID_GAMEMODE_ID = "Invalid game mode id"
+    INVALID_GAMEMODE_ID = "Invalid game mode ID"
     LOCAL_POS_FOR_SELECTOR = "^ pos can not be used for " \
         "selector argument 'x', 'y' and 'z'"
     LOCAL_POS_WITH_RELATIVE = "~ and ^ can not be used together in postion"
