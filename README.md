@@ -1,30 +1,21 @@
 # Minecraft Command Syntax Highlighter
-This is a tokenizer & parser for Minecraft commands (on Bedrock Edition).
-A simple colorizer is also included.
+This is a syntax highlighter for Minecraft Bedrock Edition commands.
 
 ## How do I use it?
-You can run `main.py` and just type in commands into the GUI.
-No thirdparty package is required. Your commands should be colorized!
+You can run `main.py` with Python and a window will appear where you can type commands and see the commands colored.
+No thirdparty package is required.
 Tags and scoreboards are marked in *italic form*.
-Options in command, selector, namespaced id and number all have different colors.
-Also, errors are marked red and underlined.
+Options in command, selector, namespaced identifier and number all have different colors.
+Also, error tokens are marked red and underlined.
 All errors come with a message that tells you what's wrong!
 
-By using `update_version` method for `MCCommandHighlighter`, you can specify
-the version of command system, using a 3-tuple later than `(1, 19, 0)`.
+By calling `update_version` method for `MCCommandHighlighter`, you can specify the version of the system, using a tuple like `(1, 19, 80)`.
+The minimum version supported is `(1, 19, 0)`
 
 ## Notice
-This project supports command in Minecraft Bedrock Edition, from 1.19.0 to 1.19.80.
-This project is still in develop and **may differ from the original command system of Minecraft in some aspects**.
+This project supports command in Minecraft Bedrock Edition, from 1.19.0 to 1.20.0.
+Since command engine of Minecraft Bedrock Edition is not open-source, the parse result this program gives **may differ from the original command system of Minecraft in some aspects**.
 Besides, not all commands are supported.
 In specific, `/gametest` and `/scriptevent` are not supported yet.
 Each command is supported in `mccmdhl.command.CommandTokenizer.c_<Name>`.
 
-## Troubleshooting
-Your Python may tell you that `idlelib` is not installed.
-This package is installed with regular Python installation.
-However, if you choose not to `Install IDLE` when installing Python
-or you are on a special platform (e.g. Android with simulator of Linux),
-this package might not be installed. For the former situation, just
-install it (`pip install idlelib`). For the later one, your installation
-might not support `tkinter`, please consider changing a platform.
