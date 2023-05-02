@@ -671,7 +671,53 @@ class CommandTokenizer(Tokenizer, VersionedMixin):
     def c_alwaysday(self):
         if self.line_not_end():
             self.token_boolean()
-    
+   
+    @versioned_method(version=(1, 20, 0))
+    def c_camera(self):
+        self.token_target() # players
+        mode = self.token_options("clear", "fade", "set")
+        if mode == "fade":
+            def _color():
+                for _ in range(3): # RGB
+                    self.token_number(0.0, 1.0)
+            if self.line_not_end():
+                fade_opt = self.token_options("time", "color")
+                if fade_opt == "time":
+                    for _ in range(3): # fadeIn, hold, fadeOut
+                        self.token_number()
+                    if self.line_not_end():
+                        self.token_options("color")
+                        _color()
+                elif fade_opt == "color":
+                    _color()
+        elif mode == "set":
+            self.token_string() # preset
+            set_opt = None
+            if self.line_not_end():
+                set_opt = self.token_options("ease", "pos", "rot", "default")
+                if set_opt == "ease":
+                    set_opt = None
+                    self.token_number() # easeTime
+                    # easeType
+                    EASE_TYPES = ["linear", "spring"]
+                    for x in ("in_", "out_", "in_out_"):
+                        for y in ("back", "bounce", "circ", "cubic", "elastic",
+                                  "expo", "quad", "quart", "quint", "sine"):
+                            EASE_TYPES.append(x + y)
+                    self.token_options(*EASE_TYPES)
+                    if self.line_not_end():
+                        set_opt = self.token_options("pos", "rot", "default")
+            def _rot():
+                self.token_rotation()
+                self.token_rotation()
+            if set_opt == "pos":
+                self.token_full_pos()
+                if self.line_not_end():
+                    self.token_options("rot")
+                    _rot()
+            elif set_opt == "rot":
+                _rot()
+
     def c_camerashake(self):
         mode = self.token_options("add", "stop")
         if mode == "add":
