@@ -1,6 +1,9 @@
 # Minecraft Command Syntax Highlighter
 This is a syntax highlighter for Minecraft Bedrock Edition commands.
 
+## Pinned
+This program will probably no longer be maintained and we have moved to [another project](https://github.com/CBerJun/MCCommandParser) with a new algorithm that supports auto-completing.
+
 ## How do I use it?
 You can run `main.py` with Python and a window will appear where you can type commands and see the commands colored.
 No thirdparty package is required.
